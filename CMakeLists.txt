@@ -8,11 +8,13 @@ include_directories(libs)
 
 file(GLOB_RECURSE sources src/*.c)
 
+message(STATUS "Sources: ${sources}")
+
 find_package(SDL2 REQUIRED)
 
 if (APPLE)
-include_directories(/opt/homebrew/include)
-link_directories(/opt/homebrew/lib/)
+  include_directories(/opt/homebrew/include)
+  link_directories(/opt/homebrew/lib/)
 endif ()
 
 add_executable(${PROJECT_NAME} ${sources})
