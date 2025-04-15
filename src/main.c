@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include "display.h"
 #include "vector.h"
+#include "color.h"
 
 #define N_POINTS 9*9*9
 #define FOV_FACTOR 640
@@ -12,11 +13,9 @@ vec3_t cube_points[N_POINTS];
 vec2_t projected_cube_points[N_POINTS];
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = -5};
+vec3_t cube_rotation = { .x = 0, .y = 0, .z = 0};
 
 bool is_running = false;
-
-int black = 0xFF000000;
-int yellow = 0xFFFFFF00;
 
 
 int setup(void) {
@@ -76,12 +75,21 @@ vec2_t project(vec3_t point) {
 }
 
 void update(void) {
+
+  cube_rotation.y += 0.001;
+  cube_rotation.x += 0.001;
+  cube_rotation.z += 0.001;
+
   for (int i = 0; i < N_POINTS; i++) {
     vec3_t point = cube_points[i];
 
-    point.z -= camera_position.z;
+    vec3_t transformed = vec3_rotate_x(point, cube_rotation.x);
+    transformed = vec3_rotate_y(transformed, cube_rotation.y);
+    transformed = vec3_rotate_z(transformed, cube_rotation.z);
 
-    vec2_t projected_point = project(point);
+    transformed.z -= camera_position.z;
+
+    vec2_t projected_point = project(transformed);
 
     projected_cube_points[i] = projected_point;
   }
@@ -98,11 +106,11 @@ void render(void) {
       projected_point.y + (window_height / 2), 
       4, 
       4, 
-      0xFFFFFF00);
+      YELLOW);
   }
 
   render_color_buffer();
-  clear_color_buffer(black);
+  clear_color_buffer(BLACK);
 
   SDL_RenderPresent(renderer);
 }
