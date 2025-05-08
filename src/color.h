@@ -3,5 +3,6 @@
 
 #define YELLOW 0xFFFFFF00
 #define BLACK 0xFF000000
+#define GREEN 0xFF00FF00
 
 #endif

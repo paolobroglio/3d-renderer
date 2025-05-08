@@ -84,6 +84,31 @@ void draw_grid(void) {
   } 
 }
 
+void draw_line(int x0, int y0, int x1, int y1, uint32_t color) {
+  int dx = x1 - x0;
+  int dy = y1 - y0;
+
+  int step = (abs(dx) > abs(dy)) ? abs(dx) : abs(dy);
+
+  float x_step = dx / (float) step;
+  float y_step = dy / (float) step;
+
+  float current_x = x0;
+  float current_y = y0;
+
+  for (int i = 0; i < step; i++) {
+    draw_pixel(round(current_x), round(current_y), color);
+    current_x += x_step;
+    current_y += y_step;
+  }
+}
+
+void draw_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+  draw_line(x0, y0, x1, y1, color);
+  draw_line(x1, y1, x2, y2, color);
+  draw_line(x2, y2, x0, y0, color);
+}
+
 void render_color_buffer(void) {
   SDL_UpdateTexture(
     color_buffer_texture, 
