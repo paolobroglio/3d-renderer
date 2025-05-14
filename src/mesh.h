@@ -22,5 +22,6 @@ extern face_t cube_faces[N_CUBE_FACES];
 extern mesh_t mesh;
 
 void load_cube_mesh_data(void);
+void load_mesh_from_obj_file(const char* filename);
 
 #endif //MESH_H

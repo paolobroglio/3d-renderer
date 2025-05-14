@@ -4,6 +4,8 @@
 #include "mesh.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "array.h"
 
@@ -54,4 +56,37 @@ void load_cube_mesh_data(void) {
         face_t face = cube_faces[i];
         array_push(mesh.faces, face);
     }
+}
+
+void load_mesh_from_obj_file(const char* filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    char line[1024];
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "v ", 2) == 0) {
+            vec3_t vertex;
+            sscanf(line, "v %f %f %f", &vertex.x, &vertex.y, &vertex.z);
+            array_push(mesh.vertices, vertex);
+        }
+        if (strncmp(line, "f ", 2) == 0) {
+            int vertex_indeces[3];
+            int texture_indeces[3];
+            int normal_indeces[3];
+            sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d",
+                &vertex_indeces[0], &texture_indeces[0], &normal_indeces[0],
+                &vertex_indeces[1], &texture_indeces[1], &normal_indeces[1],
+                &vertex_indeces[2], &texture_indeces[2], &normal_indeces[2]
+                );
+            face_t face = {
+                .a = vertex_indeces[0],
+                .b = vertex_indeces[1],
+                .c = vertex_indeces[2]
+            };
+            array_push(mesh.faces, face);
+        }
+    }
+    fclose(file);
 }

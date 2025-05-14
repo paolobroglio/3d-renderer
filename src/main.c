@@ -12,7 +12,6 @@
 triangle_t* triangles_to_render = NULL;
 
 vec3_t camera_position = { .x = 0, .y = 0, .z = -5};
-vec3_t cube_rotation = { .x = 0, .y = 0, .z = 0};
 
 bool is_running = false;
 
@@ -38,8 +37,7 @@ int setup(void) {
     return 1;
   }
 
-  load_cube_mesh_data();
-
+  load_mesh_from_obj_file("./resources/meshes/f22.obj");
   return 0;
 }
 
@@ -79,13 +77,16 @@ void update(void) {
 
   triangles_to_render = NULL;
 
-  mesh.rotation.y += 0.01;
   mesh.rotation.x += 0.01;
-  mesh.rotation.z += 0.01;
+  mesh.rotation.y += 0.00;
+  mesh.rotation.z += 0.00;
 
   int mesh_faces_length = array_length(mesh.faces);
+
   for (int i = 0; i < mesh_faces_length; i++) {
+
     face_t mesh_face = mesh.faces[i];
+
     vec3_t face_vertices[3];
     face_vertices[0] = mesh.vertices[mesh_face.a - 1];
     face_vertices[1] = mesh.vertices[mesh_face.b - 1];
@@ -95,6 +96,7 @@ void update(void) {
 
     for (int j = 0; j < 3; j++) {
       vec3_t vertex = face_vertices[j];
+
       vec3_t transformed_vertex = vec3_rotate_x(vertex, mesh.rotation.x);
       transformed_vertex = vec3_rotate_y(transformed_vertex, mesh.rotation.y);
       transformed_vertex = vec3_rotate_z(transformed_vertex, mesh.rotation.z);
@@ -108,7 +110,6 @@ void update(void) {
 
       projected_triangle.points[j] = projected_vertex;
     }
-    //triangles_to_render[i] = projected_triangle;
     array_push(triangles_to_render, projected_triangle);
   }
 }
@@ -125,19 +126,19 @@ void render(void) {
       triangle.points[0].y,
       3,
       3,
-      YELLOW);
+      RED);
     draw_rect(
       triangle.points[1].x,
       triangle.points[1].y,
       3,
       3,
-      YELLOW);
+      RED);
     draw_rect(
       triangle.points[2].x,
       triangle.points[2].y,
       3,
       3,
-      YELLOW);
+      RED);
 
     draw_triangle(
       triangle.points[0].x,
