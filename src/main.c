@@ -7,15 +7,6 @@
 #include "color.h"
 #include "mesh.h"
 #include "array.h"
-#define FOV_FACTOR 640
-
-triangle_t* triangles_to_render = NULL;
-
-vec3_t camera_position = { .x = 0, .y = 0, .z = -5};
-
-bool is_running = false;
-
-int previous_frame_time = 0;
 
 int setup(void) {
   color_buffer = (uint32_t*) malloc(sizeof(uint32_t) * window_width * window_height);

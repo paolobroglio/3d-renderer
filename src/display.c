@@ -1,3 +1,5 @@
+// TODO: DELETE
+
 #include "display.h"
 
 int window_width = 800;
