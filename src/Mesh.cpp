@@ -4,11 +4,18 @@
 
 #include "Mesh.hpp"
 
+#include <iostream>
+#include <ostream>
+
 Mesh::Mesh(const std::vector<Vec3> &vertices, const std::vector<face_t> &faces, const Vec3 &rotation) : vertices(vertices), faces(faces), rotation(rotation) {
 }
 
+void Mesh::setRotation(Vec3 vec3) {
+    rotation = vec3;
+}
+
 Mesh Mesh::loadOBJ(const std::string &filename) {
-    FILE *file = fopen(filename, "r");
+    FILE *file = fopen(filename.c_str(), "r");
     if (!file) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
@@ -41,7 +48,7 @@ Mesh Mesh::loadOBJ(const std::string &filename) {
         }
     }
     fclose(file);
-
+    std::cout << "Loaded Mesh: " << filename << std::endl;
     return mesh;
 }
 
@@ -53,6 +60,6 @@ std::vector<face_t> Mesh::getFaces() {
     return faces;
 }
 
-std::vector<Vec3> Mesh::getRotation() {
+Vec3 Mesh::getRotation() {
     return rotation;
 }

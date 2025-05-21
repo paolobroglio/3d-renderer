@@ -4,6 +4,8 @@
 
 #ifndef TRIANGLE_HPP
 #define TRIANGLE_HPP
+#include <iosfwd>
+
 #include "Vec2.hpp"
 
 typedef struct {
@@ -23,7 +25,8 @@ public:
 
     Vec2 getVertex(int i) const;
     void setVertex(int i, Vec2 v);
-};
 
+    friend std::ostream& operator<<(std::ostream& os, const Triangle& t);
+};
 
 #endif //TRIANGLE_HPP

@@ -22,13 +22,15 @@ public:
 
     ~Mesh() = default;
 
+    void setRotation(Vec3 vec3);
+
     static Mesh loadOBJ(const std::string &filename);
 
     std::vector<Vec3> getVertices();
 
     std::vector<face_t> getFaces();
 
-    std::vector<Vec3> getRotation();
+    Vec3 getRotation();
 };
 
 

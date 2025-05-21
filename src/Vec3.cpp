@@ -47,3 +47,15 @@ float Vec3::getY() const {
 float Vec3::getZ() const {
     return this->z;
 }
+
+void Vec3::setX(float x) {
+    this->x = x;
+}
+
+void Vec3::setY(float y) {
+    this->y = y;
+}
+
+void Vec3::setZ(float z) {
+    this->z = z;
+}
