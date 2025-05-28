@@ -36,6 +36,22 @@ Vec3 Vec3::rotateZ(float angle) const {
     };
 }
 
+float Vec3::getMagnitude() const {
+    return sqrt(x * x + y * y + z * z);
+}
+
+Vec3 Vec3::cross(const Vec3 &other) const {
+    return {
+        this->y * other.z - this->z * other.y,
+        this->z * other.x - this->x * other.z,
+        this->x * other.y - this->y * other.x
+    };
+}
+
+float Vec3::dot(const Vec3 &other) const {
+    return this->x * other.x + this->y * other.y + this->z * other.z;
+}
+
 float Vec3::getX() const {
     return this->x;
 }
@@ -58,4 +74,20 @@ void Vec3::setY(float y) {
 
 void Vec3::setZ(float z) {
     this->z = z;
+}
+
+Vec3 Vec3::operator+(const Vec3 &other) const {
+    return {x + other.x, y + other.y, z + other.z};
+}
+
+Vec3 Vec3::operator-(const Vec3 &other) const {
+    return {x - other.x, y - other.y, z - other.z};
+}
+
+Vec3 Vec3::operator/(float scalar) const {
+    return {x / scalar, y / scalar, z / scalar};
+}
+
+Vec3 Vec3::operator*(float scalar) const {
+    return {x * scalar, y * scalar, z * scalar};
 }
