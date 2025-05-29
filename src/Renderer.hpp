@@ -26,7 +26,7 @@ private:
     static constexpr int window_width = 800;
     static constexpr int window_height = 600;
     static constexpr int fov_factor = 640;
-    Vec3 camera_position = Vec3(0.0f, 0.0f, -5.0f);
+    Vec3 camera_position = Vec3(0.0f, 0.0f, 0.0f);
 
     bool isRunning;
     int previousFrameTime;
