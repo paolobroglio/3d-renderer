@@ -41,31 +41,52 @@ void Renderer::update() {
 
     auto meshFaces = mesh.getFaces();
 
-    for (int i = 0; i < meshFaces.size(); i++) {
+    for (auto meshFace: meshFaces) {
         auto vertices = mesh.getVertices();
-        auto meshFace = meshFaces.at(i);
-
         Vec3 face_vertices[3];
         face_vertices[0] = vertices.at(meshFace.a - 1);
         face_vertices[1] = vertices.at(meshFace.b - 1);
         face_vertices[2] = vertices.at(meshFace.c - 1);
 
-        Triangle projected_triangle;
+        Vec3 transformed_vertices[3];
 
         for (int j = 0; j < 3; j++) {
             Vec3 vertex = face_vertices[j];
-
             Vec3 transformed_vertex = vertex.rotateX(mesh.getRotation().getX());
             transformed_vertex = transformed_vertex.rotateY(mesh.getRotation().getY());
             transformed_vertex = transformed_vertex.rotateZ(mesh.getRotation().getZ());
+            transformed_vertex.setZ(transformed_vertex.getZ() + 5);
+            transformed_vertices[j] = transformed_vertex;
+        }
 
-            transformed_vertex.setZ(transformed_vertex.getZ() - camera_position.getZ());
+        // todo: backface culling
 
-            Vec2 projected_vertex = project(transformed_vertex);
+        Vec3 vectorA = transformed_vertices[0]; /*   A    */
+        Vec3 vectorB = transformed_vertices[1]; /*  / \   */
+        Vec3 vectorC = transformed_vertices[2]; /* C---B  */
 
+        Vec3 vectorAB = vectorB - vectorA;
+        Vec3 vectorAC = vectorC - vectorA;
+
+        vectorAB.normalize();
+        vectorAC.normalize();
+
+        Vec3 faceNormal = vectorAB.cross(vectorAC);
+
+        faceNormal.normalize();
+
+        Vec3 cameraRay = camera_position - vectorA;
+
+        float dot = cameraRay.dot(faceNormal);
+        if (dot < 0.0)
+            continue;
+
+        Triangle projected_triangle;
+
+        for (int j = 0; j < 3; j++) {
+            Vec2 projected_vertex = project(transformed_vertices[j]);
             projected_vertex.setX(projected_vertex.getX() + window_width / 2);
             projected_vertex.setY(projected_vertex.getY() + window_height / 2);
-
             projected_triangle.setVertex(j, projected_vertex);
         }
         trianglesToRender.push_back(projected_triangle);

@@ -16,6 +16,14 @@ public:
 
     Vec2(float x, float y);
 
+    float getMagnitude() const;
+
+    void normalize();
+
+    Vec2 cross(const Vec2 &other) const;
+
+    float dot(const Vec2 &other) const;
+
     float getX() const;
 
     float getY() const;
@@ -24,6 +32,10 @@ public:
 
     void setY(float y);
 
+    Vec2 operator+(const Vec2 &other) const;
+    Vec2 operator-(const Vec2 &other) const;
+    Vec2 operator/(float scalar) const;
+    Vec2 operator*(float scalar) const;
     friend std::ostream& operator<<(std::ostream& os, const Vec2& vec);
 };
 
