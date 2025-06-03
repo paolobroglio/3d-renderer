@@ -40,6 +40,13 @@ float Vec3::getMagnitude() const {
     return sqrt(x * x + y * y + z * z);
 }
 
+void Vec3::normalize() {
+    float magnitude = getMagnitude();
+    this->x /= magnitude;
+    this->y /= magnitude;
+    this->z /= magnitude;
+}
+
 Vec3 Vec3::cross(const Vec3 &other) const {
     return {
         this->y * other.z - this->z * other.y,

@@ -21,7 +21,7 @@ public:
 
     float getMagnitude() const;
 
-    Vec3 normalized() const;
+    void normalize();
 
     Vec3 cross(const Vec3& other) const;
 

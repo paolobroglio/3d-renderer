@@ -18,7 +18,7 @@ public:
 
     float getMagnitude() const;
 
-    Vec2 normalized() const;
+    void normalize();
 
     Vec2 cross(const Vec2 &other) const;
 

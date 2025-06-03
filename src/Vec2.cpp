@@ -15,6 +15,12 @@ float Vec2::getMagnitude() const {
     return sqrt(x * x + y * y);
 }
 
+void Vec2::normalize() {
+    float magnitude = getMagnitude();
+    this->x /= magnitude;
+    this->y /= magnitude;
+}
+
 Vec2 Vec2::cross(const Vec2 &other) const {
     return  {
         this->x * other.y - this->y * other.x,

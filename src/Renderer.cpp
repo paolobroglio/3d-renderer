@@ -68,7 +68,13 @@ void Renderer::update() {
         Vec3 vectorAB = vectorB - vectorA;
         Vec3 vectorAC = vectorC - vectorA;
 
+        vectorAB.normalize();
+        vectorAC.normalize();
+
         Vec3 faceNormal = vectorAB.cross(vectorAC);
+
+        faceNormal.normalize();
+
         Vec3 cameraRay = camera_position - vectorA;
 
         float dot = cameraRay.dot(faceNormal);
@@ -213,7 +219,7 @@ void Renderer::init() {
 
     std::cout << "Done initializing SDL" << std::endl;
 
-    mesh = Mesh::loadOBJ("resources/meshes/cube.obj");
+    mesh = Mesh::loadOBJ("resources/meshes/f22.obj");
 
     isRunning = true;
 }
