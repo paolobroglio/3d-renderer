@@ -17,6 +17,14 @@ void Renderer::processInput() {
         case SDL_KEYDOWN:
             if (event.key.keysym.sym == SDLK_ESCAPE)
                 isRunning = false;
+            if (event.key.keysym.sym == SDLK_1)
+                toggleRenderMode(RenderMode::Wireframe);
+            if (event.key.keysym.sym == SDLK_2)
+                toggleRenderMode(RenderMode::Vertices);
+            if (event.key.keysym.sym == SDLK_3)
+                toggleRenderMode(RenderMode::FilledFaces);
+            if (event.key.keysym.sym == SDLK_c)
+                toggleRenderMode(RenderMode::BackfaceCulling);
             break;
     }
 }
@@ -59,37 +67,38 @@ void Renderer::update() {
             transformed_vertices[j] = transformed_vertex;
         }
 
-        // todo: backface culling
+        bool triangle_needs_rendering = true;
+        if (hasFlag(render_mode, RenderMode::BackfaceCulling)) {
+            Vec3 vectorA = transformed_vertices[0]; /*   A    */
+            Vec3 vectorB = transformed_vertices[1]; /*  / \   */
+            Vec3 vectorC = transformed_vertices[2]; /* C---B  */
+            Vec3 vectorAB = vectorB - vectorA;
+            Vec3 vectorAC = vectorC - vectorA;
 
-        Vec3 vectorA = transformed_vertices[0]; /*   A    */
-        Vec3 vectorB = transformed_vertices[1]; /*  / \   */
-        Vec3 vectorC = transformed_vertices[2]; /* C---B  */
+            vectorAB.normalize();
+            vectorAC.normalize();
 
-        Vec3 vectorAB = vectorB - vectorA;
-        Vec3 vectorAC = vectorC - vectorA;
+            Vec3 faceNormal = vectorAB.cross(vectorAC);
 
-        vectorAB.normalize();
-        vectorAC.normalize();
+            faceNormal.normalize();
 
-        Vec3 faceNormal = vectorAB.cross(vectorAC);
+            Vec3 cameraRay = camera_position - vectorA;
 
-        faceNormal.normalize();
-
-        Vec3 cameraRay = camera_position - vectorA;
-
-        float dot = cameraRay.dot(faceNormal);
-        if (dot < 0.0)
-            continue;
-
-        Triangle projected_triangle;
-
-        for (int j = 0; j < 3; j++) {
-            Vec2 projected_vertex = project(transformed_vertices[j]);
-            projected_vertex.setX(projected_vertex.getX() + window_width / 2);
-            projected_vertex.setY(projected_vertex.getY() + window_height / 2);
-            projected_triangle.setVertex(j, projected_vertex);
+            float dot = cameraRay.dot(faceNormal);
+            if (dot < 0.0)
+                triangle_needs_rendering = false;
         }
-        trianglesToRender.push_back(projected_triangle);
+
+        if (triangle_needs_rendering) {
+            Triangle projected_triangle;
+            for (int j = 0; j < 3; j++) {
+                Vec2 projected_vertex = project(transformed_vertices[j]);
+                projected_vertex.setX(projected_vertex.getX() + window_width / 2);
+                projected_vertex.setY(projected_vertex.getY() + window_height / 2);
+                projected_triangle.setVertex(j, projected_vertex);
+            }
+            trianglesToRender.push_back(projected_triangle);
+        }
     }
 }
 
@@ -104,37 +113,54 @@ void Renderer::render_color_buffer() {
 }
 
 void Renderer::render() {
+
+    SDL_RenderClear(renderer);
+
     colorBuffer.drawGrid();
 
     for (auto triangle: trianglesToRender) {
-        colorBuffer.drawRect(
-            triangle.getVertex(0).getX(),
-            triangle.getVertex(0).getY(),
-            3,
-            3,
-            RED);
-        colorBuffer.drawRect(
-            triangle.getVertex(1).getX(),
-            triangle.getVertex(1).getY(),
-            3,
-            3,
-            RED);
-        colorBuffer.drawRect(
-            triangle.getVertex(2).getX(),
-            triangle.getVertex(2).getY(),
-            3,
-            3,
-            RED);
-
-        colorBuffer.drawTriangle(
-            triangle.getVertex(0).getX(),
-            triangle.getVertex(0).getY(),
-            triangle.getVertex(1).getX(),
-            triangle.getVertex(1).getY(),
-            triangle.getVertex(2).getX(),
-            triangle.getVertex(2).getY(),
-            YELLOW
-        );
+        if (hasFlag(render_mode, RenderMode::Wireframe)) {
+            colorBuffer.drawTriangle(
+                triangle.getVertex(0).getX(),
+                triangle.getVertex(0).getY(),
+                triangle.getVertex(1).getX(),
+                triangle.getVertex(1).getY(),
+                triangle.getVertex(2).getX(),
+                triangle.getVertex(2).getY(),
+                WHITE
+            );
+        }
+        if (hasFlag(render_mode, RenderMode::Vertices)) {
+            colorBuffer.drawRect(
+                triangle.getVertex(0).getX(),
+                triangle.getVertex(0).getY(),
+                3,
+                3,
+                RED);
+            colorBuffer.drawRect(
+                triangle.getVertex(1).getX(),
+                triangle.getVertex(1).getY(),
+                3,
+                3,
+                RED);
+            colorBuffer.drawRect(
+                triangle.getVertex(2).getX(),
+                triangle.getVertex(2).getY(),
+                3,
+                3,
+                RED);
+        }
+        if (hasFlag(render_mode, RenderMode::FilledFaces)) {
+            colorBuffer.drawFilledTriangle(
+                triangle.getVertex(0).getX(),
+                triangle.getVertex(0).getY(),
+                triangle.getVertex(1).getX(),
+                triangle.getVertex(1).getY(),
+                triangle.getVertex(2).getX(),
+                triangle.getVertex(2).getY(),
+                YELLOW
+            );
+        }
     }
 
     trianglesToRender.clear();
@@ -159,7 +185,15 @@ Vec2 Renderer::project(Vec3 projectable) {
     return projected_point;
 }
 
-Renderer::Renderer() : colorBuffer(window_width, window_height) {
+void Renderer::toggleRenderMode(const RenderMode &renderMode) {
+    if (hasFlag(this->render_mode, renderMode)) {
+        this->render_mode ^= renderMode;
+    } else {
+        this->render_mode |= renderMode;
+    }
+}
+
+Renderer::Renderer() : colorBuffer(window_width, window_height), render_mode(RenderMode::Wireframe) {
 }
 
 Renderer::~Renderer() {

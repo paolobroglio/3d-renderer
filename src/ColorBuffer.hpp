@@ -11,7 +11,9 @@ class ColorBuffer {
 private:
     int maxY, maxX;
 
-    void setColorInBuffer(int i, uint32_t color);
+    void setColorInBuffer(int i, uint32_t color) const;
+    void fillFlatBottomTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color);
+    void fillFlatTopTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color);
 
 public:
     uint32_t *buffer;
@@ -31,6 +33,8 @@ public:
     void drawLine(int x0, int y0, int x1, int y1, uint32_t color);
 
     void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color);
+
+    void drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color);
 };
 
 
