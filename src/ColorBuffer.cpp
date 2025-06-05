@@ -7,8 +7,39 @@
 #include <iostream>
 #include <tgmath.h>
 
-void ColorBuffer::setColorInBuffer(const int i, const uint32_t color) {
+void ColorBuffer::setColorInBuffer(const int i, const uint32_t color) const {
     buffer[i] = color;
+}
+
+void ColorBuffer::fillFlatBottomTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+    // m' = dX / dY inverse of the slope
+    auto slope1 = static_cast<float>(x1 - x0) / (y1 - y0);
+    auto slope2 = static_cast<float>(x2 - x0) / (y2 - y0);
+
+    float x_start = x0;
+    float x_end = x0;
+
+    for (int y = y0; y <= y2; y++) {
+        drawLine(x_start, y, x_end, y, color);
+
+        x_start += slope1;
+        x_end += slope2;
+    }
+}
+
+void ColorBuffer::fillFlatTopTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+    auto slope1 = static_cast<float>(x2 - x0) / (y2 - y0);
+    auto slope2 = static_cast<float>(x2 - x1) / (y2 - y1);
+
+    float x_start = x2;
+    float x_end = x2;
+
+    for (int y = y2; y >= y0; y--) {
+        drawLine(x_start, y, x_end, y, color);
+
+        x_start -= slope1;
+        x_end -= slope2;
+    }
 }
 
 ColorBuffer::ColorBuffer(int width, int height) : maxX(width), maxY(height) {
@@ -80,4 +111,35 @@ void ColorBuffer::drawTriangle(const int x0, const int y0, const int x1, const i
     drawLine(x0, y0, x1, y1, color);
     drawLine(x1, y1, x2, y2, color);
     drawLine(x2, y2, x0, y0, color);
+}
+
+void ColorBuffer::drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+    // TODO: try a more efficient algorithm
+    if (y0 > y1) {
+        std::swap(y0, y1);
+        std::swap(x0, x1);
+    }
+    if (y1 > y2) {
+        std::swap(y1, y2);
+        std::swap(x1, x2);
+    }
+    if (y0 > y1) {
+        std::swap(y0, y1);
+        std::swap(x0, x1);
+    }
+
+    if (y1 == y2) {
+        fillFlatBottomTriangle(x0, y0, x1, y1, x2, y2, color);
+    } else if (y0 == y1) {
+        fillFlatTopTriangle(x0, y0, x1, y1, x2, y2, color);
+    } else {
+        // Compute M(x,y)
+        auto My = y1;
+        auto Mx = (static_cast<float>((x2 - x0) * (y1 - y0)) / static_cast<float>(y2 - y0)) + x0;
+
+        // Fill flat bottom triangle
+        fillFlatBottomTriangle(x0, y0, x1, y1, Mx, My, color);
+        // Fill flat top triangle
+        fillFlatTopTriangle(x1, y1, Mx, My, x2, y2, color);
+    }
 }

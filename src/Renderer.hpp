@@ -18,6 +18,14 @@
 
 class Renderer {
 private:
+    enum class RenderMode : uint32_t {
+        None = 0,
+        Wireframe = 1 << 0,
+        Vertices = 1 << 1,
+        FilledFaces = 1 << 2,
+        BackfaceCulling = 1 << 3,
+    };
+
     SDL_Window *window;
     SDL_Renderer *renderer;
     ColorBuffer colorBuffer;
@@ -28,6 +36,7 @@ private:
     static constexpr int fov_factor = 640;
     Vec3 camera_position = Vec3(0.0f, 0.0f, 0.0f);
 
+    RenderMode render_mode;
     bool isRunning;
     int previousFrameTime;
 
@@ -46,6 +55,34 @@ private:
     void cleanup();
 
     static Vec2 project(Vec3 projectable);
+
+    void toggleRenderMode(const RenderMode& renderMode);
+
+    friend RenderMode operator|(RenderMode a, RenderMode b) {
+        return static_cast<RenderMode>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+    }
+
+    friend RenderMode operator&(RenderMode a, RenderMode b) {
+        return static_cast<RenderMode>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+    }
+
+    friend RenderMode operator^(RenderMode a, RenderMode b) {
+        return static_cast<RenderMode>(static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b));
+    }
+
+    friend RenderMode& operator|=(RenderMode& a, RenderMode b) {
+        a = a | b;
+        return a;
+    }
+
+    friend RenderMode& operator^=(RenderMode& a, RenderMode b) {
+        a = a ^ b;
+        return a;
+    }
+
+    static bool hasFlag(RenderMode value, RenderMode flag) {
+        return (static_cast<uint32_t>(value) & static_cast<uint32_t>(flag)) != 0;
+    }
 
 public:
     Renderer();
