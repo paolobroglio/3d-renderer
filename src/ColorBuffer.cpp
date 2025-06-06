@@ -5,13 +5,15 @@
 #include "ColorBuffer.hpp"
 
 #include <iostream>
-#include <tgmath.h>
 
-void ColorBuffer::setColorInBuffer(const int i, const uint32_t color) const {
-    buffer[i] = color;
+#include "Color.hpp"
+
+void ColorBuffer::setColorInBuffer(const int i, const Color color) const {
+    auto raw_color = static_cast<uint32_t>(color);
+    buffer[i] = raw_color;
 }
 
-void ColorBuffer::fillFlatBottomTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+void ColorBuffer::fillFlatBottomTriangle(const int x0, const int y0, const int x1, const int y1, const int x2, const int y2, const Color color) {
     // m' = dX / dY inverse of the slope
     auto slope1 = static_cast<float>(x1 - x0) / (y1 - y0);
     auto slope2 = static_cast<float>(x2 - x0) / (y2 - y0);
@@ -27,7 +29,7 @@ void ColorBuffer::fillFlatBottomTriangle(int x0, int y0, int x1, int y1, int x2,
     }
 }
 
-void ColorBuffer::fillFlatTopTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+void ColorBuffer::fillFlatTopTriangle(const int x0, const int y0, const int x1, const int y1, const int x2, const int y2, const Color color) {
     auto slope1 = static_cast<float>(x2 - x0) / (y2 - y0);
     auto slope2 = static_cast<float>(x2 - x1) / (y2 - y1);
 
@@ -42,7 +44,7 @@ void ColorBuffer::fillFlatTopTriangle(int x0, int y0, int x1, int y1, int x2, in
     }
 }
 
-ColorBuffer::ColorBuffer(int width, int height) : maxX(width), maxY(height) {
+ColorBuffer::ColorBuffer(const int width, const int height) : maxX(width), maxY(height) {
     buffer = static_cast<uint32_t *>(malloc(sizeof(uint32_t) * width * height));
     if (buffer == NULL) {
         fprintf(stderr, "Color buffer allocation failed\n");
@@ -54,13 +56,13 @@ ColorBuffer::~ColorBuffer() {
     free(buffer);
 }
 
-void ColorBuffer::drawPixel(int x, int y, uint32_t color) {
+void ColorBuffer::drawPixel(const int x, const int y, const Color color) const {
     if (x >= 0 && x < maxX && y >= 0 && y < maxY) {
         setColorInBuffer(maxX * y + x, color);
     }
 }
 
-void ColorBuffer::clear(const uint32_t color) {
+void ColorBuffer::clear(const Color color) const {
     for (int y = 0; y < maxY; y++) {
         for (int x = 0; x < maxX; x++) {
             setColorInBuffer(y * maxX + x, color);
@@ -68,16 +70,15 @@ void ColorBuffer::clear(const uint32_t color) {
     }
 }
 
-void ColorBuffer::drawGrid() {
-    uint32_t color = 0xFF333333;
+void ColorBuffer::drawGrid() const {
     for (int y = 0; y < maxY; y += 10) {
         for (int x = 0; x < maxX; x += 10) {
-            setColorInBuffer(y * maxX + x, color);
+            setColorInBuffer(y * maxX + x, Color::LightBlack);
         }
     }
 }
 
-void ColorBuffer::drawRect(const int x, const int y, const int w, const int h, const uint32_t color) {
+void ColorBuffer::drawRect(const int x, const int y, const int w, const int h, const Color color) const {
     for (int i = 0; i < w; i++) {
         for (int j = 0; j < h; j++) {
             int current_x = x + i;
@@ -87,7 +88,7 @@ void ColorBuffer::drawRect(const int x, const int y, const int w, const int h, c
     }
 }
 
-void ColorBuffer::drawLine(const int x0, const int y0, const int x1, const int y1, const uint32_t color) {
+void ColorBuffer::drawLine(const int x0, const int y0, const int x1, const int y1, const Color color) const {
     int dx = x1 - x0;
     int dy = y1 - y0;
 
@@ -107,13 +108,13 @@ void ColorBuffer::drawLine(const int x0, const int y0, const int x1, const int y
 }
 
 void ColorBuffer::drawTriangle(const int x0, const int y0, const int x1, const int y1, const int x2, const int y2,
-                               const uint32_t color) {
+                               const Color color) const {
     drawLine(x0, y0, x1, y1, color);
     drawLine(x1, y1, x2, y2, color);
     drawLine(x2, y2, x0, y0, color);
 }
 
-void ColorBuffer::drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color) {
+void ColorBuffer::drawFilledTriangle(int x0, int y0, int x1, int y1, int x2, int y2, const Color color) {
     // TODO: try a more efficient algorithm
     if (y0 > y1) {
         std::swap(y0, y1);

@@ -90,7 +90,9 @@ void Renderer::update() {
         }
 
         if (triangle_needs_rendering) {
-            Triangle projected_triangle;
+            float avg_depth = (transformed_vertices[0].getZ() + transformed_vertices[1].getZ() + transformed_vertices[2]
+                               .getZ()) / 3.0;
+            Triangle projected_triangle(Color::Yellow, avg_depth);
             for (int j = 0; j < 3; j++) {
                 Vec2 projected_vertex = project(transformed_vertices[j]);
                 projected_vertex.setX(projected_vertex.getX() + window_width / 2);
@@ -100,6 +102,10 @@ void Renderer::update() {
             trianglesToRender.push_back(projected_triangle);
         }
     }
+
+    std::sort(trianglesToRender.begin(), trianglesToRender.end(), [](const Triangle &a, const Triangle &b) {
+        return a.getAvgDepth() < b.getAvgDepth();
+    });
 }
 
 void Renderer::render_color_buffer() {
@@ -113,7 +119,6 @@ void Renderer::render_color_buffer() {
 }
 
 void Renderer::render() {
-
     SDL_RenderClear(renderer);
 
     colorBuffer.drawGrid();
@@ -127,7 +132,7 @@ void Renderer::render() {
                 triangle.getVertex(1).getY(),
                 triangle.getVertex(2).getX(),
                 triangle.getVertex(2).getY(),
-                WHITE
+                Color::White
             );
         }
         if (hasFlag(render_mode, RenderMode::Vertices)) {
@@ -136,19 +141,19 @@ void Renderer::render() {
                 triangle.getVertex(0).getY(),
                 3,
                 3,
-                RED);
+                Color::Red);
             colorBuffer.drawRect(
                 triangle.getVertex(1).getX(),
                 triangle.getVertex(1).getY(),
                 3,
                 3,
-                RED);
+                Color::Red);
             colorBuffer.drawRect(
                 triangle.getVertex(2).getX(),
                 triangle.getVertex(2).getY(),
                 3,
                 3,
-                RED);
+                Color::Red);
         }
         if (hasFlag(render_mode, RenderMode::FilledFaces)) {
             colorBuffer.drawFilledTriangle(
@@ -158,7 +163,7 @@ void Renderer::render() {
                 triangle.getVertex(1).getY(),
                 triangle.getVertex(2).getX(),
                 triangle.getVertex(2).getY(),
-                YELLOW
+                Color::Yellow
             );
         }
     }
@@ -166,7 +171,7 @@ void Renderer::render() {
     trianglesToRender.clear();
 
     render_color_buffer();
-    colorBuffer.clear(BLACK);
+    colorBuffer.clear(Color::Black);
 
     SDL_RenderPresent(renderer);
 }
