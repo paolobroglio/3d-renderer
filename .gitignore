@@ -34,7 +34,6 @@
 
 # Executables
 *.exe
-*.out
 *.app
 *.i*86
 *.x86_64
@@ -162,3 +161,5 @@ Temporary Items
 ### Editor/IDE ###
 .vscode
 .idea
+/zig-out/
+.zig-cache
