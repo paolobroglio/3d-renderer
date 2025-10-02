@@ -3,52 +3,70 @@ const triangle = @import("triangle.zig");
 const Face = triangle.Face;
 const std = @import("std");
 const fs = std.fs;
-const io = std.io;
+const Io = std.Io;
 const log = std.log;
 const Allocator = std.mem.Allocator;
 
-pub const Error = error {
-OBJFile
-};
+pub const Error = error{ OBJFileNotOpened, OBJFileNotRead };
 
 pub const Mesh = struct {
-    vertices: std.ArrayList(Vec3),
-    faces: std.ArrayList(Face),
+    allocator: Allocator,
+    vertices: std.ArrayListUnmanaged(Vec3),
+    faces: std.ArrayListUnmanaged(Face),
     rotation: Vec3 = Vec3.zero(),
 
     pub fn init(allocator: Allocator) Mesh {
-        return Mesh {
-          .vertices = std.ArrayList(Vec3).init(allocator),
-          .faces = std.ArrayList(Face).init(allocator)
-        };
+        return Mesh{ .allocator = allocator, .vertices = std.ArrayListUnmanaged(Vec3).empty, .faces = std.ArrayListUnmanaged(Face).empty };
     }
 
-    pub fn loadOBJ(self: *Mesh, obj_filepath: []const u8) Error!void {
-        const obj_file = fs.cwd().openFile(obj_filepath, .{}) catch |err|{
-            log.err("Error when opening OBJ file {s} - {}", .{obj_filepath, err});
-            return Error.OBJFile;
+    pub fn deinit(self: *Mesh) void {
+        self.vertices.deinit(self.allocator);
+        self.faces.deinit(self.allocator);
+    }
+
+    pub fn loadOBJ(self: *Mesh, allocator: std.mem.Allocator, obj_filepath: []const u8) Error!void {
+        const obj_file = fs.cwd().openFile(obj_filepath, .{ .mode = .read_only }) catch |err| {
+            log.err("Error when opening OBJ file {s} - {}", .{ obj_filepath, err });
+            return Error.OBJFileNotOpened;
         };
         defer obj_file.close();
 
-        var buf_reader = io.bufferedReader(obj_file.reader());
-        var input_stream = buf_reader.reader();
-        var buffer: [1024]u8 = undefined;
-        while (try input_stream.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-            if (std.mem.startsWith(u8, line, "v ")) {
-                var iter = std.mem.tokenizeScalar(u8, line[2..], ' ');
-                const x = try std.fmt.parseFloat(f32, iter.next().?);
-                const y = try std.fmt.parseFloat(f32, iter.next().?);
-                const z = try std.fmt.parseFloat(f32, iter.next().?);
+        var read_buffer: [1024]u8 = undefined;
+        var file_reader: std.fs.File.Reader = obj_file.reader(&read_buffer);
 
-                try self.vertices.append(Vec3{.x = x, .y = y, .z = z});
+        const reader = &file_reader.interface;
+        var line = Io.Writer.Allocating.init(allocator);
+        defer line.deinit();
+
+        while (true) {
+            _ = reader.streamDelimiter(&line.writer, '\n') catch |err| {
+                if (err == error.EndOfStream) break else return Error.OBJFileNotRead;
+            };
+            _ = reader.toss(1);
+
+            const written_bytes = line.written();
+
+            if (std.mem.startsWith(u8, written_bytes, "v ")) {
+                var iter = std.mem.tokenizeScalar(u8, written_bytes[2..], ' ');
+                const x = try parseVertexFloat(iter.next().?);
+                const y = try parseVertexFloat(iter.next().?);
+                const z = try parseVertexFloat(iter.next().?);
+
+                self.vertices.append(self.allocator, Vec3{ .x = x, .y = y, .z = z }) catch |err| {
+                    std.log.err("[Renderer] Vertices buffer OOM: {}", .{err});
+                    return Error.OBJFileNotRead;
+                };
             }
-            if (std.mem.startsWith(u8, line, "f ")) {
-                var iter = std.mem.tokenizeScalar(u8, line[2..], ' ');
+            if (std.mem.startsWith(u8, written_bytes, "f ")) {
+                var iter = std.mem.tokenizeScalar(u8, written_bytes[2..], ' ');
                 var vertex_indices: [3]i32 = undefined;
                 var i: usize = 0;
                 while (iter.next()) |vertex_data| : (i += 1) {
                     var slash_iter = std.mem.tokenizeScalar(u8, vertex_data, '/');
-                    vertex_indices[i] = try std.fmt.parseInt(i32, slash_iter.next().?, 10);
+                    vertex_indices[i] = std.fmt.parseInt(i32, slash_iter.next().?, 10) catch |err| {
+                        std.log.err("[Renderer] Invalid int value in OBJ File: {}", .{err});
+                        return Error.OBJFileNotRead;
+                    };
                 }
                 const face = Face{
                     .a = vertex_indices[0],
@@ -56,9 +74,22 @@ pub const Mesh = struct {
                     .c = vertex_indices[2],
                 };
 
-                try self.faces.append(face);
+                self.faces.append(self.allocator, face) catch |err| {
+                    std.log.err("[Renderer] Faces buffer OOM: {}", .{err});
+                    return Error.OBJFileNotRead;
+                };
             }
+
+            line.clearRetainingCapacity();
         }
+
         return;
+    }
+
+    fn parseVertexFloat(s: []const u8) Error!f32 {
+        return std.fmt.parseFloat(f32, s) catch |err| {
+            std.log.err("[Renderer] Invalid float value in OBJ file: {}", .{err});
+            return Error.OBJFileNotRead;
+        };
     }
 };

@@ -2,51 +2,53 @@ const std = @import("std");
 const mem = std.mem;
 const Color = @import("color.zig").Color;
 
+const Error = error{ColorNotSet};
+
 pub const ColorBuffer = struct {
+    allocator: mem.Allocator,
     maxX: usize,
     maxY: usize,
-    b: std.ArrayList(u32),
+    b: std.ArrayListUnmanaged(Color),
 
-    pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) ColorBuffer {
-        return ColorBuffer{
-            .maxX = width,
-            .maxY = height,
-            .b = std.ArrayList(u32).initCapacity(allocator, width * height)
-        };
+    pub fn init(allocator: mem.Allocator, width: usize, height: usize) anyerror!ColorBuffer {
+        var b = try std.ArrayListUnmanaged(Color).initCapacity(allocator, width * height);
+        try b.appendNTimes(allocator, Color.Black, width * height);
+
+        return ColorBuffer{ .allocator = allocator, .maxX = width, .maxY = height, .b = b };
     }
 
-    pub fn free(self: *ColorBuffer) void {
-        self.b.deinit();
+    pub fn deinit(self: *ColorBuffer) void {
+        self.b.deinit(self.allocator);
     }
 
-    pub fn drawPixel(self: *ColorBuffer, x: usize, y: usize, color: Color) void {
+    pub fn drawPixel(self: *ColorBuffer, x: usize, y: usize, color: Color) Error!void {
         if (x >= 0 and x < self.maxX and y >= 0 and y < self.maxY) {
-            self.setColor(y * self.maxX + y, color);
+            try self.setColor(y * self.maxX + x, color);
         }
     }
 
-    pub fn drawGrid(self: *ColorBuffer) void {
+    pub fn drawGrid(self: *ColorBuffer) Error!void {
         var y_i: usize = 0;
-        while (y_i < self.maxY) |y| : (y_i += 10) {
+        while (y_i < self.maxY) : (y_i += 10) {
             var x_i: usize = 0;
-            while (x_i < self.maxX) |x| : (x_i += 10) {
-                self.drawPixel(x, y, Color.LightBlack);
+            while (x_i < self.maxX) : (x_i += 10) {
+                try self.drawPixel(x_i, y_i, Color.LightGrey);
             }
         }
     }
 
-    pub fn drawRectangle(self: *ColorBuffer, x: usize, y: usize, height: usize, width: usize, color: Color) void {
+    pub fn drawRectangle(self: *ColorBuffer, x: usize, y: usize, height: usize, width: usize, color: Color) Error!void {
         for (0..width) |i| {
             for (0..height) |j| {
                 const curr_x = x + i;
                 const curr_y = y + j;
 
-                self.drawPixel(curr_x, curr_y, color);
+                try self.drawPixel(curr_x, curr_y, color);
             }
         }
     }
 
-    pub fn drawLine(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, color: Color) void {
+    pub fn drawLine(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, color: Color) Error!void {
         const dx: usize = x1 - x0;
         const dy: usize = y1 - y0;
 
@@ -69,7 +71,7 @@ pub const ColorBuffer = struct {
             const x: usize = @intFromFloat(current_x);
             const y: usize = @intFromFloat(current_y);
 
-            self.drawPixel(x, y, color);
+            try self.drawPixel(x, y, color);
 
             current_x += x_step;
             current_y += y_step;
@@ -77,10 +79,10 @@ pub const ColorBuffer = struct {
         }
     }
 
-    pub fn drawTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) void {
-        self.drawLine(x0, y0, x1, y1, color);
-        self.drawLine(x1, y1, x2, y2, color);
-        self.drawLine(x2, y2, x0, y0, color);
+    pub fn drawTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) Error!void {
+        try self.drawLine(x0, y0, x1, y1, color);
+        try self.drawLine(x1, y1, x2, y2, color);
+        try self.drawLine(x2, y2, x0, y0, color);
     }
 
     pub fn drawFilledTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) void {
@@ -112,13 +114,13 @@ pub const ColorBuffer = struct {
         }
     }
 
-    pub fn clear(self: *ColorBuffer, color: Color) void {
-        for (self.b, 0..) |_, i| {
-            self.setColor(i, color);
+    pub fn clear(self: *ColorBuffer, color: Color) Error!void {
+        for (self.b.items, 0..) |_, i| {
+            try self.setColor(i, color);
         }
     }
 
-    fn fillFlatBottomTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) void {
+    fn fillFlatBottomTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) Error!void {
         const slope_1_numerator: f32 = @floatFromInt(x1 - x0);
         const slope_1_denominator: f32 = @floatFromInt(y1 - y0);
         const slope_1: f32 = slope_1_numerator / slope_1_denominator;
@@ -134,15 +136,14 @@ pub const ColorBuffer = struct {
             const x_start_us: usize = @intFromFloat(x_start);
             const x_end_us: usize = @intFromFloat(x_end);
 
-            self.drawLine(x_start_us, y, x_end_us, y, color);
+            try self.drawLine(x_start_us, y, x_end_us, y, color);
 
             x_start += slope_1;
             x_end += slope_2;
         }
-
     }
 
-    fn fillFlatTopTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) void {
+    fn fillFlatTopTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) Error!void {
         const slope_1_numerator: f32 = @floatFromInt(x2 - x0);
         const slope_1_denominator: f32 = @floatFromInt(y2 - y0);
         const slope_1: f32 = slope_1_numerator / slope_1_denominator;
@@ -159,15 +160,17 @@ pub const ColorBuffer = struct {
             const x_start_us: usize = @intFromFloat(x_start);
             const x_end_us: usize = @intFromFloat(x_end);
 
-            self.drawLine(x_start_us, y, x_end_us, y, color);
+            try self.drawLine(x_start_us, y, x_end_us, y, color);
 
             x_start -= slope_1;
             x_end -= slope_2;
         }
-
     }
 
-    fn setColor(self: *ColorBuffer, pos: usize, color: Color) void {
+    fn setColor(self: *ColorBuffer, pos: usize, color: Color) Error!void {
+        if (pos > self.b.capacity) {
+            return Error.ColorNotSet;
+        }
         self.b.items[pos] = color;
     }
 };
