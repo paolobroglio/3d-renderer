@@ -39,4 +39,25 @@ pub const Vec3 = struct {
     pub fn scalarDiv(self: *const Vec3, n: f32) Vec3 {
         return self.scalarProd(1 / n);
     }
+
+    pub fn rotateX(self: *const Vec3, angle: f32) Vec3 {
+        const cos_a: f32 = @cos(angle);
+        const sin_a: f32 = @sin(angle);
+
+        return Vec3{ .x = self.x, .y = self.y * cos_a - self.z * sin_a, .z = self.y * sin_a + self.z * cos_a };
+    }
+
+    pub fn rotateY(self: *const Vec3, angle: f32) Vec3 {
+        const cos_a: f32 = @cos(angle);
+        const sin_a: f32 = @sin(angle);
+
+        return Vec3{ .x = self.x * cos_a - self.z * sin_a, .y = self.y, .z = self.x * sin_a + self.z * cos_a };
+    }
+
+    pub fn rotateZ(self: *const Vec3, angle: f32) Vec3 {
+        const cos_a: f32 = @cos(angle);
+        const sin_a: f32 = @sin(angle);
+
+        return Vec3{ .x = self.x * cos_a - self.y * sin_a, .y = self.x * sin_a + self.y * cos_a, .z = self.z };
+    }
 };
