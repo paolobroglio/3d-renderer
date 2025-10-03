@@ -1,4 +1,4 @@
-const Vec3 = @import("vec3.zig").Vec3;
+const Vec3 = @import("Vec3.zig");
 const triangle = @import("triangle.zig");
 const Face = triangle.Face;
 const std = @import("std");
@@ -7,7 +7,7 @@ const Io = std.Io;
 const log = std.log;
 const Allocator = std.mem.Allocator;
 
-pub const Error = error{ OBJFileNotOpened, OBJFileNotRead };
+pub const Error = error{ OBJFileNotOpened, OBJFileNotFound, OBJFileMalformed, MeshOutOfMemory };
 
 pub const Mesh = struct {
     allocator: Allocator,
@@ -27,7 +27,7 @@ pub const Mesh = struct {
     pub fn loadOBJ(self: *Mesh, allocator: std.mem.Allocator, obj_filepath: []const u8) Error!void {
         const obj_file = fs.cwd().openFile(obj_filepath, .{ .mode = .read_only }) catch |err| {
             log.err("Error when opening OBJ file {s} - {}", .{ obj_filepath, err });
-            return Error.OBJFileNotOpened;
+            return Error.OBJFileNotFound;
         };
         defer obj_file.close();
 
@@ -40,7 +40,7 @@ pub const Mesh = struct {
 
         while (true) {
             _ = reader.streamDelimiter(&line.writer, '\n') catch |err| {
-                if (err == error.EndOfStream) break else return Error.OBJFileNotRead;
+                if (err == error.EndOfStream) break else return Error.OBJFileMalformed;
             };
             _ = reader.toss(1);
 
@@ -54,7 +54,7 @@ pub const Mesh = struct {
 
                 self.vertices.append(self.allocator, Vec3{ .x = x, .y = y, .z = z }) catch |err| {
                     std.log.err("[Renderer] Vertices buffer OOM: {}", .{err});
-                    return Error.OBJFileNotRead;
+                    return Error.MeshOutOfMemory;
                 };
             }
             if (std.mem.startsWith(u8, written_bytes, "f ")) {
@@ -65,7 +65,7 @@ pub const Mesh = struct {
                     var slash_iter = std.mem.tokenizeScalar(u8, vertex_data, '/');
                     vertex_indices[i] = std.fmt.parseInt(i32, slash_iter.next().?, 10) catch |err| {
                         std.log.err("[Renderer] Invalid int value in OBJ File: {}", .{err});
-                        return Error.OBJFileNotRead;
+                        return Error.MeshOutOfMemory;
                     };
                 }
                 const face = Face{
@@ -76,7 +76,7 @@ pub const Mesh = struct {
 
                 self.faces.append(self.allocator, face) catch |err| {
                     std.log.err("[Renderer] Faces buffer OOM: {}", .{err});
-                    return Error.OBJFileNotRead;
+                    return Error.MeshOutOfMemory;
                 };
             }
 
@@ -89,7 +89,7 @@ pub const Mesh = struct {
     fn parseVertexFloat(s: []const u8) Error!f32 {
         return std.fmt.parseFloat(f32, s) catch |err| {
             std.log.err("[Renderer] Invalid float value in OBJ file: {}", .{err});
-            return Error.OBJFileNotRead;
+            return Error.OBJFileMalformed;
         };
     }
 };

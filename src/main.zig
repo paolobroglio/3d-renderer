@@ -6,7 +6,7 @@ pub fn main() anyerror!void {
     defer {
         const deinit_status = gpa.deinit();
         if (deinit_status == .leak) {
-            std.log.err("GPA leak detected", .{});
+            std.log.err("[Renderer] GPA leak detected", .{});
         }
     }
     const allocator = gpa.allocator();

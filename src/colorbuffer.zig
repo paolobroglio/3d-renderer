@@ -1,8 +1,8 @@
 const std = @import("std");
 const mem = std.mem;
-const Color = @import("color.zig").Color;
+const Color = @import("Color.zig").Color;
 
-const Error = error{ColorNotSet};
+const Error = error{ColorBufferOutOfBounds};
 
 pub const ColorBuffer = struct {
     allocator: mem.Allocator,
@@ -208,7 +208,7 @@ pub const ColorBuffer = struct {
 
     fn setColor(self: *ColorBuffer, pos: usize, color: Color) Error!void {
         if (pos > self.b.capacity) {
-            return Error.ColorNotSet;
+            return Error.ColorBufferOutOfBounds;
         }
         self.b.items[pos] = @intFromEnum(color);
     }

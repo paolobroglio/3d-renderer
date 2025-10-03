@@ -1,21 +1,21 @@
 const std = @import("std");
 const log = std.log;
 const rl = @import("raylib");
-const Color = @import("color.zig").Color;
+const Color = @import("Color.zig").Color;
 const ColorBuffer = @import("colorbuffer.zig").ColorBuffer;
 const mesh = @import("mesh.zig");
 const Mesh = mesh.Mesh;
 const Face = mesh.Face;
 const Triangle = @import("triangle.zig").Triangle;
-const Vec3 = @import("vec3.zig").Vec3;
-const Vec2 = @import("vec2.zig").Vec2;
+const Vec3 = @import("Vec3.zig");
+const Vec2 = @import("Vec2.zig");
 
 const WINDOW_WIDTH: u32 = 800;
 const WINDOW_HEIGHT: u32 = 600;
 const FPS: u32 = 60;
 const FOV_FACTOR: f32 = 640.0;
 
-pub const Error = error{ Initialization, Running, MeshLoadingNotLoaded, ColorBufferNotInitialized, Render, Projection };
+pub const Error = error{ Initialization, Running, ColorBufferTextureLoadingFailed, MeshLoadingFailed, ColorBufferMemoryLeaked, TrianglesArrayOutOfMemory, Render, Projection };
 
 const RenderMode = packed struct {
     wireframe: bool = false,
@@ -49,7 +49,7 @@ pub const Renderer = struct {
 
         const color_buffer = ColorBuffer.init(allocator, color_buffer_width, color_buffer_height) catch |err| {
             log.err("[Renderer] Error when initializing color buffer: {}", .{err});
-            return Error.ColorBufferNotInitialized;
+            return Error.ColorBufferMemoryLeaked;
         };
 
         return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
@@ -108,7 +108,7 @@ pub const Renderer = struct {
             face_vertices[2] = self.mesh.vertices.items[third_face_vertex - 1];
 
             var transformed_vertices: [3]Vec3 = undefined;
-            for (0..3) |i| { // todo: maybe this for can be removed
+            for (0..3) |i| {
                 const vertex: Vec3 = face_vertices[i];
                 var transformed_vertex: Vec3 = vertex.rotateX(self.mesh.rotation.x);
                 transformed_vertex = transformed_vertex.rotateY(self.mesh.rotation.y);
@@ -118,7 +118,6 @@ pub const Renderer = struct {
                 transformed_vertices[i] = transformed_vertex;
             }
 
-            // todo: add Backface Culling processing
             var triangle_will_be_rendered: bool = true;
             if (self.render_mode.backface_culling) {
                 //    A
@@ -168,7 +167,7 @@ pub const Renderer = struct {
 
                 self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
                     log.err("[Renderer] Error when projecting triangle: {}", .{err});
-                    return Error.Projection;
+                    return Error.TrianglesArrayOutOfMemory;
                 };
             }
         }
@@ -188,7 +187,7 @@ pub const Renderer = struct {
 
         self.mesh.loadOBJ(self.allocator, "resources/meshes/f22.obj") catch |err| {
             log.err("[Renderer] Error while loading mesh from OBJ file: {}", .{err});
-            return Error.MeshLoadingNotLoaded;
+            return Error.MeshLoadingFailed;
         };
 
         log.info("[Renderer] Mesh faces loaded: {}", .{self.mesh.faces.items.len});
@@ -205,7 +204,7 @@ pub const Renderer = struct {
         };
         self.color_buffer_texture = rl.loadTextureFromImage(image) catch |err| {
             log.err("[Renderer] Error while loading color buffer texture: {}", .{err});
-            return Error.ColorBufferNotInitialized;
+            return Error.ColorBufferTextureLoadingFailed;
         };
         rl.setTextureFilter(self.color_buffer_texture, rl.TextureFilter.point);
 
@@ -224,7 +223,7 @@ pub const Renderer = struct {
 
         self.color_buffer.drawGrid() catch |err| {
             log.err("[Renderer] Error rendering grid: {}", .{err});
-            return Error.Render;
+            return Error.ColorBufferMemoryLeaked;
         };
 
         for (self.triangles_to_render.items) |triangle| {
@@ -238,31 +237,31 @@ pub const Renderer = struct {
             if (self.render_mode.wireframe) {
                 self.color_buffer.drawTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Red) catch |err| {
                     log.err("[Renderer] Error rendering a triangle: {}", .{err});
-                    return Error.Render;
+                    return Error.ColorBufferMemoryLeaked;
                 };
             }
 
             if (self.render_mode.vertices) {
                 self.color_buffer.drawRectangle(v1_x, v1_y, 3, 3, Color.Red) catch |err| {
                     log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                    return Error.Render;
+                    return Error.ColorBufferMemoryLeaked;
                 };
 
                 self.color_buffer.drawRectangle(v2_x, v2_y, 3, 3, Color.Red) catch |err| {
                     log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                    return Error.Render;
+                    return Error.ColorBufferMemoryLeaked;
                 };
 
                 self.color_buffer.drawRectangle(v3_x, v3_y, 3, 3, Color.Red) catch |err| {
                     log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                    return Error.Render;
+                    return Error.ColorBufferMemoryLeaked;
                 };
             }
 
             if (self.render_mode.filled_faces) {
                 self.color_buffer.drawFilledTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Yellow) catch |err| {
                     log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                    return Error.Render;
+                    return Error.ColorBufferMemoryLeaked;
                 };
             }
         }
@@ -273,7 +272,7 @@ pub const Renderer = struct {
 
         self.color_buffer.clear(Color.Black) catch |err| {
             log.err("[Renderer] Error clearing the color buffer: {}", .{err});
-            return Error.Render;
+            return Error.ColorBufferMemoryLeaked;
         };
     }
 
