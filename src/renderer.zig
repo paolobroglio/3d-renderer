@@ -17,7 +17,19 @@ const FOV_FACTOR: f32 = 640.0;
 
 pub const Error = error{ Initialization, Running, MeshLoadingNotLoaded, ColorBufferNotInitialized, Render, Projection };
 
-pub const RenderMode = enum { None, Wireframe, Vertices, FilledFaces, BackfaceCulling };
+const RenderMode = packed struct {
+    wireframe: bool = false,
+    vertices: bool = false,
+    filled_faces: bool = false,
+    backface_culling: bool = false,
+
+    pub fn toggle(self: *RenderMode, flag: RenderMode) void {
+        const self_int_coded: u4 = @as(u4, @bitCast(self.*));
+        const flag_int_coded: u4 = @as(u4, @bitCast(flag));
+
+        self.* = @bitCast(self_int_coded ^ flag_int_coded);
+    }
+};
 
 pub const Renderer = struct {
     allocator: std.mem.Allocator,
@@ -40,7 +52,7 @@ pub const Renderer = struct {
             return Error.ColorBufferNotInitialized;
         };
 
-        return Renderer{ .allocator = allocator, .render_mode = RenderMode.None, .camera_position = Vec3.zero(), .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
+        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
     }
 
     pub fn run(self: *Renderer) Error!void {
@@ -59,25 +71,24 @@ pub const Renderer = struct {
     }
 
     fn processInput(self: *Renderer) void {
-        // todo: proper toggle render modes
-        if (rl.isKeyDown(.q)) {
+        if (rl.isKeyPressed(.q)) {
             self.is_running = false;
             return;
         }
-        if (rl.isKeyDown(.one)) {
-            self.render_mode = RenderMode.Wireframe;
+        if (rl.isKeyPressed(.one)) {
+            self.render_mode.toggle(RenderMode{ .wireframe = true });
             return;
         }
-        if (rl.isKeyDown(.two)) {
-            self.render_mode = RenderMode.Vertices;
+        if (rl.isKeyPressed(.two)) {
+            self.render_mode.toggle(RenderMode{ .vertices = true });
             return;
         }
-        if (rl.isKeyDown(.three)) {
-            self.render_mode = RenderMode.FilledFaces;
+        if (rl.isKeyPressed(.three)) {
+            self.render_mode.toggle(RenderMode{ .filled_faces = true });
             return;
         }
-        if (rl.isKeyDown(.b)) {
-            self.render_mode = RenderMode.BackfaceCulling;
+        if (rl.isKeyPressed(.b)) {
+            self.render_mode.toggle(RenderMode{ .backface_culling = true });
             return;
         }
     }
@@ -108,32 +119,58 @@ pub const Renderer = struct {
             }
 
             // todo: add Backface Culling processing
+            var triangle_will_be_rendered: bool = true;
+            if (self.render_mode.backface_culling) {
+                //    A
+                //   / \
+                //  C---B
+                const vertex_a: Vec3 = transformed_vertices[0];
+                const vertex_b: Vec3 = transformed_vertices[1];
+                const vertex_c: Vec3 = transformed_vertices[2];
+                const vector_ab: Vec3 = vertex_b.sub(vertex_a);
+                const vector_ac: Vec3 = vertex_c.sub(vertex_a);
 
-            const average_depth: f32 = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
-            var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = Color.Yellow };
+                const vector_ab_norm: Vec3 = vector_ab.normalized();
+                const vector_ac_norm: Vec3 = vector_ac.normalized();
 
-            var projected_vertex_v1: Vec2 = project(transformed_vertices[0]);
-            var projected_vertex_v2: Vec2 = project(transformed_vertices[1]);
-            var projected_vertex_v3: Vec2 = project(transformed_vertices[2]);
+                const face_normal: Vec3 = vector_ab_norm.crossProd(vector_ac_norm);
+                const face_normal_normalized: Vec3 = face_normal.normalized();
 
-            const window_width_f: f32 = @floatFromInt(WINDOW_WIDTH);
-            const window_height_f: f32 = @floatFromInt(WINDOW_HEIGHT);
+                const camera_ray: Vec3 = self.camera_position.sub(vertex_a);
+                const camera_normal_dot: f32 = camera_ray.dotProd(face_normal_normalized);
 
-            projected_vertex_v1.x = projected_vertex_v1.x + (window_width_f / 2.0);
-            projected_vertex_v1.y = projected_vertex_v1.y + (window_height_f / 2.0);
-            projected_vertex_v2.x = projected_vertex_v2.x + (window_width_f / 2.0);
-            projected_vertex_v2.y = projected_vertex_v2.y + (window_height_f / 2.0);
-            projected_vertex_v3.x = projected_vertex_v3.x + (window_width_f / 2.0);
-            projected_vertex_v3.y = projected_vertex_v3.y + (window_height_f / 2.0);
+                if (camera_normal_dot < 0.0) {
+                    triangle_will_be_rendered = false;
+                }
+            }
 
-            projected_triangle.v1 = projected_vertex_v1;
-            projected_triangle.v2 = projected_vertex_v2;
-            projected_triangle.v3 = projected_vertex_v3;
+            if (triangle_will_be_rendered) {
+                const average_depth: f32 = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
+                var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = Color.Yellow };
 
-            self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
-                log.err("[Renderer] Error when projecting triangle: {}", .{err});
-                return Error.Projection;
-            };
+                var projected_vertex_v1: Vec2 = project(transformed_vertices[0]);
+                var projected_vertex_v2: Vec2 = project(transformed_vertices[1]);
+                var projected_vertex_v3: Vec2 = project(transformed_vertices[2]);
+
+                const window_width_f: f32 = @floatFromInt(WINDOW_WIDTH);
+                const window_height_f: f32 = @floatFromInt(WINDOW_HEIGHT);
+
+                projected_vertex_v1.x = projected_vertex_v1.x + (window_width_f / 2.0);
+                projected_vertex_v1.y = projected_vertex_v1.y + (window_height_f / 2.0);
+                projected_vertex_v2.x = projected_vertex_v2.x + (window_width_f / 2.0);
+                projected_vertex_v2.y = projected_vertex_v2.y + (window_height_f / 2.0);
+                projected_vertex_v3.x = projected_vertex_v3.x + (window_width_f / 2.0);
+                projected_vertex_v3.y = projected_vertex_v3.y + (window_height_f / 2.0);
+
+                projected_triangle.v1 = projected_vertex_v1;
+                projected_triangle.v2 = projected_vertex_v2;
+                projected_triangle.v3 = projected_vertex_v3;
+
+                self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
+                    log.err("[Renderer] Error when projecting triangle: {}", .{err});
+                    return Error.Projection;
+                };
+            }
         }
     }
 
@@ -174,6 +211,8 @@ pub const Renderer = struct {
 
         log.info("[Renderer] Setup completed", .{});
 
+        self.render_mode.toggle(RenderMode{ .wireframe = true });
+
         self.is_running = true;
     }
 
@@ -196,30 +235,36 @@ pub const Renderer = struct {
             const v3_x: usize = @intFromFloat(triangle.v3.x);
             const v3_y: usize = @intFromFloat(triangle.v3.y);
 
-            self.color_buffer.drawTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Red) catch |err| {
-                log.err("[Renderer] Error rendering a triangle: {}", .{err});
-                return Error.Render;
-            };
+            if (self.render_mode.wireframe) {
+                self.color_buffer.drawTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Red) catch |err| {
+                    log.err("[Renderer] Error rendering a triangle: {}", .{err});
+                    return Error.Render;
+                };
+            }
 
-            self.color_buffer.drawRectangle(v1_x, v1_y, 3, 3, Color.Red) catch |err| {
-                log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                return Error.Render;
-            };
+            if (self.render_mode.vertices) {
+                self.color_buffer.drawRectangle(v1_x, v1_y, 3, 3, Color.Red) catch |err| {
+                    log.err("[Renderer] Error rendering a rectangle: {}", .{err});
+                    return Error.Render;
+                };
 
-            self.color_buffer.drawRectangle(v2_x, v2_y, 3, 3, Color.Red) catch |err| {
-                log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                return Error.Render;
-            };
+                self.color_buffer.drawRectangle(v2_x, v2_y, 3, 3, Color.Red) catch |err| {
+                    log.err("[Renderer] Error rendering a rectangle: {}", .{err});
+                    return Error.Render;
+                };
 
-            self.color_buffer.drawRectangle(v3_x, v3_y, 3, 3, Color.Red) catch |err| {
-                log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                return Error.Render;
-            };
+                self.color_buffer.drawRectangle(v3_x, v3_y, 3, 3, Color.Red) catch |err| {
+                    log.err("[Renderer] Error rendering a rectangle: {}", .{err});
+                    return Error.Render;
+                };
+            }
 
-            self.color_buffer.drawFilledTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Yellow) catch |err| {
-                log.err("[Renderer] Error rendering a rectangle: {}", .{err});
-                return Error.Render;
-            };
+            if (self.render_mode.filled_faces) {
+                self.color_buffer.drawFilledTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Yellow) catch |err| {
+                    log.err("[Renderer] Error rendering a rectangle: {}", .{err});
+                    return Error.Render;
+                };
+            }
         }
 
         self.triangles_to_render.clearRetainingCapacity();
