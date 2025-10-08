@@ -96,13 +96,16 @@ pub const Renderer = struct {
     }
 
     fn update(self: *Renderer) Error!void {
-        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.01, .y = 0.01, .z = 0.00 });
-        self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.002, .y = 0.001, .z = 0.000 });
-        self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.01, .y = 0.00, .z = 0.00 });
+        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.01, .y = 0.00, .z = 0.00 });
+        //self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.001, .y = 0.001, .z = 0.000 });
+        self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.001, .y = 0.00, .z = 0.00 });
         self.mesh.translation.z = 5.0;
 
         const scale_matrix: Matrix = Matrix.scale(self.mesh.scale.x, self.mesh.scale.y, self.mesh.scale.z);
         const translation_matrix: Matrix = Matrix.translate(self.mesh.translation.x, self.mesh.translation.y, self.mesh.translation.z);
+        const rotation_matrix_x: Matrix = Matrix.rotateX(self.mesh.rotation.x);
+        const rotation_matrix_y: Matrix = Matrix.rotateY(self.mesh.rotation.y);
+        const rotation_matrix_z: Matrix = Matrix.rotateZ(self.mesh.rotation.z);
 
         for (self.mesh.faces.items) |face| {
             const first_face_vertex: usize = @intCast(face.a);
@@ -118,10 +121,15 @@ pub const Renderer = struct {
             for (0..3) |i| {
                 const vertex: Vec4 = Vec4.fromVec3(face_vertices[i]);
 
-                var transformed_vertex: Vec4 = scale_matrix.multiplyByVec4(vertex);
-                transformed_vertex = translation_matrix.multiplyByVec4(transformed_vertex);
+                // TRANSFORMATION ORDER: scale -> rotation -> translation
+                var world_matrix: Matrix = Matrix.identity();
+                world_matrix = scale_matrix.mul(world_matrix);
+                world_matrix = rotation_matrix_x.mul(world_matrix);
+                world_matrix = rotation_matrix_y.mul(world_matrix);
+                world_matrix = rotation_matrix_z.mul(world_matrix);
+                world_matrix = translation_matrix.mul(world_matrix);
 
-                //transformed_vertex.z = transformed_vertex.z + 5.0;
+                const transformed_vertex = world_matrix.multiplyByVec4(vertex);
 
                 transformed_vertices[i] = transformed_vertex;
             }
