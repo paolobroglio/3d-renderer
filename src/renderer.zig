@@ -9,6 +9,8 @@ const Face = mesh.Face;
 const Triangle = @import("triangle.zig").Triangle;
 const Vec3 = @import("Vec3.zig");
 const Vec2 = @import("Vec2.zig");
+const Vec4 = @import("Vec4.zig");
+const Matrix = @import("Matrix.zig");
 
 const WINDOW_WIDTH: u32 = 800;
 const WINDOW_HEIGHT: u32 = 600;
@@ -94,8 +96,13 @@ pub const Renderer = struct {
     }
 
     fn update(self: *Renderer) Error!void {
-        // todo: manage time frame
         self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.01, .y = 0.01, .z = 0.00 });
+        self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.002, .y = 0.001, .z = 0.000 });
+        self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.01, .y = 0.00, .z = 0.00 });
+        self.mesh.translation.z = 5.0;
+
+        const scale_matrix: Matrix = Matrix.scale(self.mesh.scale.x, self.mesh.scale.y, self.mesh.scale.z);
+        const translation_matrix: Matrix = Matrix.translate(self.mesh.translation.x, self.mesh.translation.y, self.mesh.translation.z);
 
         for (self.mesh.faces.items) |face| {
             const first_face_vertex: usize = @intCast(face.a);
@@ -107,25 +114,27 @@ pub const Renderer = struct {
             face_vertices[1] = self.mesh.vertices.items[second_face_vertex - 1];
             face_vertices[2] = self.mesh.vertices.items[third_face_vertex - 1];
 
-            var transformed_vertices: [3]Vec3 = undefined;
+            var transformed_vertices: [3]Vec4 = undefined;
             for (0..3) |i| {
-                const vertex: Vec3 = face_vertices[i];
-                var transformed_vertex: Vec3 = vertex.rotateX(self.mesh.rotation.x);
-                transformed_vertex = transformed_vertex.rotateY(self.mesh.rotation.y);
-                transformed_vertex = transformed_vertex.rotateZ(self.mesh.rotation.z);
-                transformed_vertex.z = transformed_vertex.z + 5.0;
+                const vertex: Vec4 = Vec4.fromVec3(face_vertices[i]);
+
+                var transformed_vertex: Vec4 = scale_matrix.multiplyByVec4(vertex);
+                transformed_vertex = translation_matrix.multiplyByVec4(transformed_vertex);
+
+                //transformed_vertex.z = transformed_vertex.z + 5.0;
 
                 transformed_vertices[i] = transformed_vertex;
             }
+
+            const vertex_a: Vec3 = transformed_vertices[0].toVec3();
+            const vertex_b: Vec3 = transformed_vertices[1].toVec3();
+            const vertex_c: Vec3 = transformed_vertices[2].toVec3();
 
             var triangle_will_be_rendered: bool = true;
             if (self.render_mode.backface_culling) {
                 //    A
                 //   / \
                 //  C---B
-                const vertex_a: Vec3 = transformed_vertices[0];
-                const vertex_b: Vec3 = transformed_vertices[1];
-                const vertex_c: Vec3 = transformed_vertices[2];
                 const vector_ab: Vec3 = vertex_b.sub(vertex_a);
                 const vector_ac: Vec3 = vertex_c.sub(vertex_a);
 
@@ -144,12 +153,12 @@ pub const Renderer = struct {
             }
 
             if (triangle_will_be_rendered) {
-                const average_depth: f32 = (transformed_vertices[0].z + transformed_vertices[1].z + transformed_vertices[2].z) / 3.0;
+                const average_depth: f32 = (vertex_a.z + vertex_b.z + vertex_c.z) / 3.0;
                 var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = Color.Yellow };
 
-                var projected_vertex_v1: Vec2 = project(transformed_vertices[0]);
-                var projected_vertex_v2: Vec2 = project(transformed_vertices[1]);
-                var projected_vertex_v3: Vec2 = project(transformed_vertices[2]);
+                var projected_vertex_v1: Vec2 = project(vertex_a);
+                var projected_vertex_v2: Vec2 = project(vertex_b);
+                var projected_vertex_v3: Vec2 = project(vertex_c);
 
                 const window_width_f: f32 = @floatFromInt(WINDOW_WIDTH);
                 const window_height_f: f32 = @floatFromInt(WINDOW_HEIGHT);
@@ -227,6 +236,7 @@ pub const Renderer = struct {
         };
 
         for (self.triangles_to_render.items) |triangle| {
+            // FIXME: panic: integer part of floating point value out of bounds
             const v1_x: usize = @intFromFloat(triangle.v1.x);
             const v1_y: usize = @intFromFloat(triangle.v1.y);
             const v2_x: usize = @intFromFloat(triangle.v2.x);

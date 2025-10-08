@@ -92,7 +92,6 @@ pub const ColorBuffer = struct {
     }
 
     pub fn drawFilledTriangle(self: *ColorBuffer, x0: usize, y0: usize, x1: usize, y1: usize, x2: usize, y2: usize, color: Color) Error!void {
-        // Create mutable local copies
         var mx0 = x0;
         var my0 = y0;
         var mx1 = x1;
@@ -119,8 +118,6 @@ pub const ColorBuffer = struct {
             try self.fillFlatTopTriangle(mx0, my0, mx1, my1, mx2, my2, color);
         } else {
             const m_y: usize = my1;
-
-            // Convert to signed integers for calculation
             const mx0_i: isize = @intCast(mx0);
             const my0_i: isize = @intCast(my0);
             const mx2_i: isize = @intCast(mx2);
