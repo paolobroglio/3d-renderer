@@ -37,7 +37,7 @@ pub const Renderer = struct {
     allocator: std.mem.Allocator,
     render_mode: RenderMode,
     camera_position: Vec3,
-    light_source_position: Vec3,
+    light_source_direction: Vec3,
     is_running: bool,
     prev_frame_time: u32,
 
@@ -55,10 +55,11 @@ pub const Renderer = struct {
             return Error.ColorBufferMemoryLeaked;
         };
 
-        var light_source_position = Vec3.zero();
-        light_source_position.z = 1.0;
+        var light_source_direction = Vec3.zero();
+        light_source_direction.z = 1.0;
+        const light_dir_norm = light_source_direction.normalized();
 
-        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .light_source_position = light_source_position, .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
+        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .light_source_direction = light_dir_norm, .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
     }
 
     pub fn run(self: *Renderer) Error!void {
@@ -165,8 +166,8 @@ pub const Renderer = struct {
 
             if (triangle_will_be_rendered) {
                 // LIGHTING
-                const light_ray: Vec3 = self.light_source_position.sub(vertex_a);
-                const light_normal_dot: f32 = light_ray.dotProd(face_normal_normalized);
+                const light_ray: Vec3 = self.light_source_direction.sub(vertex_a);
+                const light_normal_dot: f32 = face_normal_normalized.dotProd(light_ray);
                 const triangle_color: Color = applyLightIntensity(Color.White, light_normal_dot);
 
                 const average_depth: f32 = (vertex_a.z + vertex_b.z + vertex_c.z) / 3.0;
@@ -200,7 +201,7 @@ pub const Renderer = struct {
         std.mem.sort(Triangle, self.triangles_to_render.items, {}, struct {
             fn lessThan(context: void, a: Triangle, b: Triangle) bool {
                 _ = context;
-                return a.depth < b.depth;
+                return a.depth > b.depth;
             }
         }.lessThan);
     }
