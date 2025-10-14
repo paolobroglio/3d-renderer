@@ -74,7 +74,7 @@ pub const ColorBuffer = struct {
         var current_y: f32 = @floatFromInt(y0);
 
         var i: i32 = 0;
-        while (i < step) : (i += 1) {
+        while (i <= step) : (i += 1) {
             const current_x_i: i32 = @intFromFloat(current_x);
             const current_y_i: i32 = @intFromFloat(current_y);
             try self.drawPixel(current_x_i, current_y_i, color);
@@ -116,11 +116,7 @@ pub const ColorBuffer = struct {
             try self.fillFlatTopTriangle(mx0, my0, mx1, my1, mx2, my2, color);
         } else {
             const m_y: i32 = my1;
-            const m_x_numerator: f32 = @floatFromInt((mx2 - mx0) * (my1 - my0));
-            const m_x_denominator: f32 = @floatFromInt(my2 - my0);
-            const x0_f: f32 = @floatFromInt(mx0);
-            const m_x_f: f32 = (m_x_numerator / m_x_denominator) + x0_f;
-            const m_x: i32 = @intFromFloat(m_x_f);
+            const m_x: i32 = @divTrunc((mx2 - mx0) * (my1 - my0), my2 - my0) + mx0;
 
             try self.fillFlatBottomTriangle(mx0, my0, mx1, my1, m_x, m_y, color);
             try self.fillFlatTopTriangle(mx1, my1, m_x, m_y, mx2, my2, color);

@@ -217,7 +217,7 @@ pub const Renderer = struct {
 
         log.info("[Renderer] Loading OBJ file into mesh", .{});
 
-        self.mesh.loadOBJ(self.allocator, "resources/meshes/cube.obj") catch |err| {
+        self.mesh.loadOBJ(self.allocator, "resources/meshes/f22.obj") catch |err| {
             log.err("[Renderer] Error while loading mesh from OBJ file: {}", .{err});
             return Error.MeshLoadingFailed;
         };
