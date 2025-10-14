@@ -5,4 +5,9 @@ pub const Color = enum(u32) {
     Red = 0xFF0000FF,
     White = 0xFFFFFFFF,
     LightGrey = 0xFF333333,
+    _,
+
+    pub fn fromU32(value: u32) Color {
+        return @enumFromInt(value);
+    }
 };
