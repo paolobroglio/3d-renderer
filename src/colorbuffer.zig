@@ -154,7 +154,6 @@ pub const ColorBuffer = struct {
     }
 
     fn fillFlatTopTriangle(self: *ColorBuffer, x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) Error!void {
-
         const slope_1_numerator: f32 = @floatFromInt(x2 - x0);
         const slope_1_denominator: f32 = @floatFromInt(y2 - y0);
         const slope_1: f32 = slope_1_numerator / slope_1_denominator;

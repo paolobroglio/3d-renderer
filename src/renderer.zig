@@ -109,7 +109,7 @@ pub const Renderer = struct {
     }
 
     fn update(self: *Renderer) Error!void {
-        // self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.004, .y = 0.004, .z = 0.004 });
+        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.005, .y = 0.000, .z = 0.000 });
         //self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.001, .y = 0.001, .z = 0.000 });
         //self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.001, .y = 0.00, .z = 0.00 });
         self.mesh.translation.z = 5.0;
@@ -199,9 +199,9 @@ pub const Renderer = struct {
                     projected_points[i] = proj;
                 }
 
-                projected_triangle.v1 = Vec2 {.x = projected_points[0].x, .y = projected_points[0].y };
-                projected_triangle.v2 = Vec2 {.x = projected_points[1].x, .y = projected_points[1].y };
-                projected_triangle.v3 = Vec2 {.x = projected_points[2].x, .y = projected_points[2].y };
+                projected_triangle.v1 = Vec2{ .x = projected_points[0].x, .y = projected_points[0].y };
+                projected_triangle.v2 = Vec2{ .x = projected_points[1].x, .y = projected_points[1].y };
+                projected_triangle.v3 = Vec2{ .x = projected_points[2].x, .y = projected_points[2].y };
 
                 self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
                     log.err("[Renderer] Error when projecting triangle: {}", .{err});
