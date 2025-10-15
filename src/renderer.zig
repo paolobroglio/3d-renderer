@@ -17,6 +17,13 @@ const WINDOW_HEIGHT: u32 = 600;
 const FPS: u32 = 60;
 const FOV_FACTOR: f32 = 640.0;
 
+const FOV: f32 = std.math.pi / 3.0;
+const WHEIGHT_F: f32 = @floatFromInt(WINDOW_HEIGHT);
+const WWIDTH_F: f32 = @floatFromInt(WINDOW_WIDTH);
+const ASPECT: f32 = WHEIGHT_F / WWIDTH_F;
+const ZNEAR: f32 = 0.1;
+const ZFAR: f32 = 100.0;
+
 pub const Error = error{ Initialization, Running, ColorBufferTextureLoadingFailed, MeshLoadingFailed, ColorBufferMemoryLeaked, TrianglesArrayOutOfMemory, Render, Projection };
 
 const RenderMode = packed struct {
@@ -43,6 +50,7 @@ pub const Renderer = struct {
 
     triangles_to_render: std.ArrayListUnmanaged(Triangle),
     mesh: Mesh,
+    projection_matrix: Matrix,
     color_buffer: ColorBuffer,
     color_buffer_texture: rl.Texture2D,
 
@@ -59,7 +67,7 @@ pub const Renderer = struct {
         light_source_direction.z = 1.0;
         const light_dir_norm = light_source_direction.normalized();
 
-        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .light_source_direction = light_dir_norm, .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
+        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .light_source_direction = light_dir_norm, .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .projection_matrix = undefined, .color_buffer = color_buffer, .color_buffer_texture = undefined };
     }
 
     pub fn run(self: *Renderer) Error!void {
@@ -101,7 +109,7 @@ pub const Renderer = struct {
     }
 
     fn update(self: *Renderer) Error!void {
-        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.004, .y = 0.004, .z = 0.004 });
+        // self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.004, .y = 0.004, .z = 0.004 });
         //self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.001, .y = 0.001, .z = 0.000 });
         //self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.001, .y = 0.00, .z = 0.00 });
         self.mesh.translation.z = 5.0;
@@ -173,23 +181,23 @@ pub const Renderer = struct {
                 const average_depth: f32 = (vertex_a.z + vertex_b.z + vertex_c.z) / 3.0;
                 var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = triangle_color };
 
-                var projected_vertex_v1: Vec2 = project(vertex_a);
-                var projected_vertex_v2: Vec2 = project(vertex_b);
-                var projected_vertex_v3: Vec2 = project(vertex_c);
+                var projected_points: [3]Vec4 = undefined;
+                for (0..3) |i| {
+                    var proj: Vec4 = self.projection_matrix.perspectiveDivide(transformed_vertices[i]);
 
-                const window_width_f: f32 = @floatFromInt(WINDOW_WIDTH);
-                const window_height_f: f32 = @floatFromInt(WINDOW_HEIGHT);
+                    // Scale
+                    proj.x *= (WWIDTH_F / 2.0);
+                    proj.y *= (WHEIGHT_F / 2.0);
+                    // Translate
+                    proj.x += (WWIDTH_F / 2.0);
+                    proj.y += (WHEIGHT_F / 2.0);
 
-                projected_vertex_v1.x = projected_vertex_v1.x + (window_width_f / 2.0);
-                projected_vertex_v1.y = projected_vertex_v1.y + (window_height_f / 2.0);
-                projected_vertex_v2.x = projected_vertex_v2.x + (window_width_f / 2.0);
-                projected_vertex_v2.y = projected_vertex_v2.y + (window_height_f / 2.0);
-                projected_vertex_v3.x = projected_vertex_v3.x + (window_width_f / 2.0);
-                projected_vertex_v3.y = projected_vertex_v3.y + (window_height_f / 2.0);
+                    projected_points[i] = proj;
+                }
 
-                projected_triangle.v1 = projected_vertex_v1;
-                projected_triangle.v2 = projected_vertex_v2;
-                projected_triangle.v3 = projected_vertex_v3;
+                projected_triangle.v1 = Vec2 {.x = projected_points[0].x, .y = projected_points[0].y };
+                projected_triangle.v2 = Vec2 {.x = projected_points[1].x, .y = projected_points[1].y };
+                projected_triangle.v3 = Vec2 {.x = projected_points[2].x, .y = projected_points[2].y };
 
                 self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
                     log.err("[Renderer] Error when projecting triangle: {}", .{err});
@@ -204,10 +212,6 @@ pub const Renderer = struct {
                 return a.depth > b.depth;
             }
         }.lessThan);
-    }
-
-    fn project(projectable: Vec3) Vec2 {
-        return Vec2{ .x = (FOV_FACTOR * projectable.x) / projectable.z, .y = (FOV_FACTOR * projectable.y) / projectable.z };
     }
 
     fn setup(self: *Renderer) Error!void {
@@ -240,6 +244,8 @@ pub const Renderer = struct {
             return Error.ColorBufferTextureLoadingFailed;
         };
         rl.setTextureFilter(self.color_buffer_texture, rl.TextureFilter.point);
+
+        self.projection_matrix = Matrix.perspective(FOV, ASPECT, ZNEAR, ZFAR);
 
         log.info("[Renderer] Setup completed", .{});
 

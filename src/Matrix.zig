@@ -22,6 +22,18 @@ pub fn identity() Matrix {
     } };
 }
 
+pub fn perspective(fov: f32, aspect: f32, znear: f32, zfar: f32) Matrix {
+    var mat: Matrix = zero();
+
+    mat.m[0][0] = aspect * (1.0 / @tan(fov / 2.0));
+    mat.m[1][1] = 1.0 / @tan(fov / 2.0);
+    mat.m[2][2] = zfar / (zfar - znear);
+    mat.m[2][3] = (-zfar * znear) / (zfar - znear);
+    mat.m[3][2] = 1.0;
+
+    return mat;
+}
+
 pub fn scale(sx: f32, sy: f32, sz: f32) Matrix {
     return Matrix{ .m = [4][4]f32{
         [_]f32{ 1.0 * sx, 0.0, 0.0, 0.0 },
@@ -38,6 +50,16 @@ pub fn translate(sx: f32, sy: f32, sz: f32) Matrix {
         [_]f32{ 0.0, 0.0, 1.0, sz },
         [_]f32{ 0.0, 0.0, 0.0, 1.0 },
     } };
+}
+
+pub fn perspectiveDivide(self: *const Matrix, vec: Vec4) Vec4 {
+    var res: Vec4 = self.multiplyByVec4(vec);
+    if (res.w != 0.0) {
+        res.x /= res.w;
+        res.y /= res.w;
+        res.z /= res.w;
+    }
+    return res;
 }
 
 pub fn rotateZ(angle: f32) Matrix {
