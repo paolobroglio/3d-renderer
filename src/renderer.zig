@@ -188,6 +188,10 @@ pub const Renderer = struct {
                     // Scale
                     proj.x *= (WWIDTH_F / 2.0);
                     proj.y *= (WHEIGHT_F / 2.0);
+
+                    // Invert Y axis
+                    proj.y *= -1;
+
                     // Translate
                     proj.x += (WWIDTH_F / 2.0);
                     proj.y += (WHEIGHT_F / 2.0);
