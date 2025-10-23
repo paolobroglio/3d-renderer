@@ -17,6 +17,13 @@ const WINDOW_HEIGHT: u32 = 600;
 const FPS: u32 = 60;
 const FOV_FACTOR: f32 = 640.0;
 
+const FOV: f32 = std.math.pi / 3.0;
+const WHEIGHT_F: f32 = @floatFromInt(WINDOW_HEIGHT);
+const WWIDTH_F: f32 = @floatFromInt(WINDOW_WIDTH);
+const ASPECT: f32 = WHEIGHT_F / WWIDTH_F;
+const ZNEAR: f32 = 0.1;
+const ZFAR: f32 = 100.0;
+
 pub const Error = error{ Initialization, Running, ColorBufferTextureLoadingFailed, MeshLoadingFailed, ColorBufferMemoryLeaked, TrianglesArrayOutOfMemory, Render, Projection };
 
 const RenderMode = packed struct {
@@ -37,11 +44,13 @@ pub const Renderer = struct {
     allocator: std.mem.Allocator,
     render_mode: RenderMode,
     camera_position: Vec3,
+    light_source_direction: Vec3,
     is_running: bool,
     prev_frame_time: u32,
 
     triangles_to_render: std.ArrayListUnmanaged(Triangle),
     mesh: Mesh,
+    projection_matrix: Matrix,
     color_buffer: ColorBuffer,
     color_buffer_texture: rl.Texture2D,
 
@@ -54,7 +63,11 @@ pub const Renderer = struct {
             return Error.ColorBufferMemoryLeaked;
         };
 
-        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .color_buffer = color_buffer, .color_buffer_texture = undefined };
+        var light_source_direction = Vec3.zero();
+        light_source_direction.z = 1.0;
+        const light_dir_norm = light_source_direction.normalized();
+
+        return Renderer{ .allocator = allocator, .render_mode = RenderMode{}, .camera_position = Vec3.zero(), .light_source_direction = light_dir_norm, .is_running = false, .prev_frame_time = 0, .triangles_to_render = std.ArrayListUnmanaged(Triangle).empty, .mesh = Mesh.init(allocator), .projection_matrix = undefined, .color_buffer = color_buffer, .color_buffer_texture = undefined };
     }
 
     pub fn run(self: *Renderer) Error!void {
@@ -96,9 +109,9 @@ pub const Renderer = struct {
     }
 
     fn update(self: *Renderer) Error!void {
-        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.01, .y = 0.00, .z = 0.00 });
+        self.mesh.rotation = self.mesh.rotation.add(Vec3{ .x = 0.005, .y = 0.000, .z = 0.000 });
         //self.mesh.scale = self.mesh.scale.add(Vec3{ .x = 0.001, .y = 0.001, .z = 0.000 });
-        self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.001, .y = 0.00, .z = 0.00 });
+        //self.mesh.translation = self.mesh.translation.add(Vec3{ .x = 0.001, .y = 0.00, .z = 0.00 });
         self.mesh.translation.z = 5.0;
 
         const scale_matrix: Matrix = Matrix.scale(self.mesh.scale.x, self.mesh.scale.y, self.mesh.scale.z);
@@ -138,22 +151,21 @@ pub const Renderer = struct {
             const vertex_b: Vec3 = transformed_vertices[1].toVec3();
             const vertex_c: Vec3 = transformed_vertices[2].toVec3();
 
+            //    A
+            //   / \
+            //  C---B
+            const vector_ab: Vec3 = vertex_b.sub(vertex_a);
+            const vector_ac: Vec3 = vertex_c.sub(vertex_a);
+            const vector_ab_norm: Vec3 = vector_ab.normalized();
+            const vector_ac_norm: Vec3 = vector_ac.normalized();
+            const face_normal: Vec3 = vector_ab_norm.crossProd(vector_ac_norm);
+            const face_normal_normalized: Vec3 = face_normal.normalized();
+
+            // BACKFACE CULLING
             var triangle_will_be_rendered: bool = true;
             if (self.render_mode.backface_culling) {
-                //    A
-                //   / \
-                //  C---B
-                const vector_ab: Vec3 = vertex_b.sub(vertex_a);
-                const vector_ac: Vec3 = vertex_c.sub(vertex_a);
-
-                const vector_ab_norm: Vec3 = vector_ab.normalized();
-                const vector_ac_norm: Vec3 = vector_ac.normalized();
-
-                const face_normal: Vec3 = vector_ab_norm.crossProd(vector_ac_norm);
-                const face_normal_normalized: Vec3 = face_normal.normalized();
-
                 const camera_ray: Vec3 = self.camera_position.sub(vertex_a);
-                const camera_normal_dot: f32 = camera_ray.dotProd(face_normal_normalized);
+                const camera_normal_dot: f32 = face_normal_normalized.dotProd(camera_ray);
 
                 if (camera_normal_dot < 0.0) {
                     triangle_will_be_rendered = false;
@@ -161,26 +173,35 @@ pub const Renderer = struct {
             }
 
             if (triangle_will_be_rendered) {
+                // LIGHTING
+                const light_ray: Vec3 = self.light_source_direction.sub(vertex_a);
+                const light_normal_dot: f32 = face_normal_normalized.dotProd(light_ray);
+                const triangle_color: Color = applyLightIntensity(Color.White, light_normal_dot);
+
                 const average_depth: f32 = (vertex_a.z + vertex_b.z + vertex_c.z) / 3.0;
-                var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = Color.Yellow };
+                var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = triangle_color };
 
-                var projected_vertex_v1: Vec2 = project(vertex_a);
-                var projected_vertex_v2: Vec2 = project(vertex_b);
-                var projected_vertex_v3: Vec2 = project(vertex_c);
+                var projected_points: [3]Vec4 = undefined;
+                for (0..3) |i| {
+                    var proj: Vec4 = self.projection_matrix.perspectiveDivide(transformed_vertices[i]);
 
-                const window_width_f: f32 = @floatFromInt(WINDOW_WIDTH);
-                const window_height_f: f32 = @floatFromInt(WINDOW_HEIGHT);
+                    // Scale
+                    proj.x *= (WWIDTH_F / 2.0);
+                    proj.y *= (WHEIGHT_F / 2.0);
 
-                projected_vertex_v1.x = projected_vertex_v1.x + (window_width_f / 2.0);
-                projected_vertex_v1.y = projected_vertex_v1.y + (window_height_f / 2.0);
-                projected_vertex_v2.x = projected_vertex_v2.x + (window_width_f / 2.0);
-                projected_vertex_v2.y = projected_vertex_v2.y + (window_height_f / 2.0);
-                projected_vertex_v3.x = projected_vertex_v3.x + (window_width_f / 2.0);
-                projected_vertex_v3.y = projected_vertex_v3.y + (window_height_f / 2.0);
+                    // Invert Y axis
+                    proj.y *= -1;
 
-                projected_triangle.v1 = projected_vertex_v1;
-                projected_triangle.v2 = projected_vertex_v2;
-                projected_triangle.v3 = projected_vertex_v3;
+                    // Translate
+                    proj.x += (WWIDTH_F / 2.0);
+                    proj.y += (WHEIGHT_F / 2.0);
+
+                    projected_points[i] = proj;
+                }
+
+                projected_triangle.v1 = Vec2{ .x = projected_points[0].x, .y = projected_points[0].y };
+                projected_triangle.v2 = Vec2{ .x = projected_points[1].x, .y = projected_points[1].y };
+                projected_triangle.v3 = Vec2{ .x = projected_points[2].x, .y = projected_points[2].y };
 
                 self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
                     log.err("[Renderer] Error when projecting triangle: {}", .{err});
@@ -188,10 +209,13 @@ pub const Renderer = struct {
                 };
             }
         }
-    }
 
-    fn project(projectable: Vec3) Vec2 {
-        return Vec2{ .x = (FOV_FACTOR * projectable.x) / projectable.z, .y = (FOV_FACTOR * projectable.y) / projectable.z };
+        std.mem.sort(Triangle, self.triangles_to_render.items, {}, struct {
+            fn lessThan(context: void, a: Triangle, b: Triangle) bool {
+                _ = context;
+                return a.depth > b.depth;
+            }
+        }.lessThan);
     }
 
     fn setup(self: *Renderer) Error!void {
@@ -225,9 +249,11 @@ pub const Renderer = struct {
         };
         rl.setTextureFilter(self.color_buffer_texture, rl.TextureFilter.point);
 
+        self.projection_matrix = Matrix.perspective(FOV, ASPECT, ZNEAR, ZFAR);
+
         log.info("[Renderer] Setup completed", .{});
 
-        self.render_mode.toggle(RenderMode{ .wireframe = true });
+        self.render_mode.toggle(RenderMode{ .backface_culling = true, .filled_faces = true });
 
         self.is_running = true;
     }
@@ -245,12 +271,12 @@ pub const Renderer = struct {
 
         for (self.triangles_to_render.items) |triangle| {
             // FIXME: panic: integer part of floating point value out of bounds
-            const v1_x: usize = @intFromFloat(triangle.v1.x);
-            const v1_y: usize = @intFromFloat(triangle.v1.y);
-            const v2_x: usize = @intFromFloat(triangle.v2.x);
-            const v2_y: usize = @intFromFloat(triangle.v2.y);
-            const v3_x: usize = @intFromFloat(triangle.v3.x);
-            const v3_y: usize = @intFromFloat(triangle.v3.y);
+            const v1_x: i32 = @intFromFloat(triangle.v1.x);
+            const v1_y: i32 = @intFromFloat(triangle.v1.y);
+            const v2_x: i32 = @intFromFloat(triangle.v2.x);
+            const v2_y: i32 = @intFromFloat(triangle.v2.y);
+            const v3_x: i32 = @intFromFloat(triangle.v3.x);
+            const v3_y: i32 = @intFromFloat(triangle.v3.y);
 
             if (self.render_mode.wireframe) {
                 self.color_buffer.drawTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Red) catch |err| {
@@ -277,7 +303,7 @@ pub const Renderer = struct {
             }
 
             if (self.render_mode.filled_faces) {
-                self.color_buffer.drawFilledTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, Color.Yellow) catch |err| {
+                self.color_buffer.drawFilledTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, triangle.color) catch |err| {
                     log.err("[Renderer] Error rendering a rectangle: {}", .{err});
                     return Error.ColorBufferMemoryLeaked;
                 };
@@ -297,5 +323,22 @@ pub const Renderer = struct {
     fn renderColorBuffer(self: *Renderer) void {
         rl.updateTexture(self.color_buffer_texture, self.color_buffer.b.items.ptr);
         rl.drawTextureEx(self.color_buffer_texture, rl.Vector2{ .x = 0, .y = 0 }, 0.0, 1.0, rl.Color.white);
+    }
+
+    fn applyLightIntensity(original_color: Color, light_distance_factor: f32) Color {
+        const factor = @min(1.0, @max(0.0, light_distance_factor));
+
+        const color_i: u32 = @intFromEnum(original_color);
+
+        const a: u32 = color_i & 0xFF000000;
+        const r: u32 = (color_i >> 16) & 0xFF;
+        const g: u32 = (color_i >> 8) & 0xFF;
+        const b: u32 = color_i & 0xFF;
+
+        const r_lit: u32 = @intFromFloat(@as(f32, @floatFromInt(r)) * factor);
+        const g_lit: u32 = @intFromFloat(@as(f32, @floatFromInt(g)) * factor);
+        const b_lit: u32 = @intFromFloat(@as(f32, @floatFromInt(b)) * factor);
+
+        return Color.fromU32(a | (r_lit << 16) | (g_lit << 8) | b_lit);
     }
 };

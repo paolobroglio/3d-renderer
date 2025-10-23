@@ -14,15 +14,11 @@ pub const Mesh = struct {
     vertices: std.ArrayListUnmanaged(Vec3),
     faces: std.ArrayListUnmanaged(Face),
     rotation: Vec3 = Vec3.zero(),
-    scale: Vec3 = Vec3 { .x = 1.0, .y = 1.0, .z = 1.0 },
+    scale: Vec3 = Vec3{ .x = 1.0, .y = 1.0, .z = 1.0 },
     translation: Vec3 = Vec3.zero(),
 
     pub fn init(allocator: Allocator) Mesh {
-        return Mesh{
-            .allocator = allocator,
-            .vertices = std.ArrayListUnmanaged(Vec3).empty,
-            .faces = std.ArrayListUnmanaged(Face).empty
-        };
+        return Mesh{ .allocator = allocator, .vertices = std.ArrayListUnmanaged(Vec3).empty, .faces = std.ArrayListUnmanaged(Face).empty };
     }
 
     pub fn deinit(self: *Mesh) void {
