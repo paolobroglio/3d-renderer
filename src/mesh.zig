@@ -1,11 +1,46 @@
 const Vec3 = @import("Vec3.zig");
 const triangle = @import("triangle.zig");
+const texture = @import("texture.zig");
+const UVCoords = texture.UVCoords;
 const Face = triangle.Face;
 const std = @import("std");
 const fs = std.fs;
 const Io = std.Io;
 const log = std.log;
 const Allocator = std.mem.Allocator;
+
+
+const debug_cube_vertices: [8]Vec3 = [8]Vec3{
+    Vec3{.x = -1, .y = -1, .z = -1},
+    Vec3{.x = -1, .y = 1, .z = -1},
+    Vec3{.x = 1, .y = 1, .z = -1},
+    Vec3{.x = 1, .y = -1, .z = -1},
+    Vec3{.x = 1, .y = 1, .z = 1},
+    Vec3{.x = 1, .y = -1, .z = 1},
+    Vec3{.x = -1, .y = 1, .z = 1},
+    Vec3{.x = -1, .y = -1, .z = 1},
+};
+
+const debug_cube_faces: [12]Face = [12]Face {
+    // front
+  Face {.a = 1, .b = 2, .c = 3, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 1, .b = 3, .c = 4, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+    // right
+    Face {.a = 4, .b = 3, .c = 5, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 4, .b = 5, .c = 6, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+  // back
+    Face {.a = 6, .b = 5, .c = 7, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 6, .b = 7, .c = 8, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+  // left
+    Face {.a = 8, .b = 7, .c = 2, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 8, .b = 2, .c = 1, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+  // top
+    Face {.a = 2, .b = 7, .c = 5, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 2, .b = 5, .c = 3, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+  // bottom
+    Face {.a = 6, .b = 8, .c = 1, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 0, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 1}},
+  Face {.a = 6, .b = 1, .c = 4, .a_uv = UVCoords{.u = 0, .v = 0}, .b_uv = UVCoords{.u = 1, .v = 1}, .c_uv = UVCoords{.u = 1, .v = 0}},
+};
 
 pub const Error = error{ OBJFileNotOpened, OBJFileNotFound, OBJFileMalformed, MeshOutOfMemory };
 
@@ -73,7 +108,7 @@ pub const Mesh = struct {
                 const face = Face{
                     .a = vertex_indices[0],
                     .b = vertex_indices[1],
-                    .c = vertex_indices[2],
+                    .c = vertex_indices[2]
                 };
 
                 self.faces.append(self.allocator, face) catch |err| {
@@ -85,6 +120,16 @@ pub const Mesh = struct {
             line.clearRetainingCapacity();
         }
 
+        return;
+    }
+
+    pub fn loadDebugCubeMesh(self: *Mesh, allocator: Allocator) anyerror!void {
+        for (debug_cube_vertices) |vec3| {
+            try self.vertices.append(allocator, vec3);
+        }
+        for (debug_cube_faces) |face| {
+            try self.faces.append(allocator, face);
+        }
         return;
     }
 

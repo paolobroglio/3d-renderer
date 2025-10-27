@@ -11,6 +11,8 @@ const Vec3 = @import("Vec3.zig");
 const Vec2 = @import("Vec2.zig");
 const Vec4 = @import("Vec4.zig");
 const Matrix = @import("Matrix.zig");
+const texture = @import("texture.zig");
+const UVCoords = texture.UVCoords;
 
 const WINDOW_WIDTH: u32 = 800;
 const WINDOW_HEIGHT: u32 = 600;
@@ -31,10 +33,11 @@ const RenderMode = packed struct {
     vertices: bool = false,
     filled_faces: bool = false,
     backface_culling: bool = false,
+    textured: bool = false,
 
     pub fn toggle(self: *RenderMode, flag: RenderMode) void {
-        const self_int_coded: u4 = @as(u4, @bitCast(self.*));
-        const flag_int_coded: u4 = @as(u4, @bitCast(flag));
+        const self_int_coded: u5 = @as(u5, @bitCast(self.*));
+        const flag_int_coded: u5 = @as(u5, @bitCast(flag));
 
         self.* = @bitCast(self_int_coded ^ flag_int_coded);
     }
@@ -102,6 +105,10 @@ pub const Renderer = struct {
             self.render_mode.toggle(RenderMode{ .filled_faces = true });
             return;
         }
+        if (rl.isKeyPressed(.four)) {
+            self.render_mode.toggle(RenderMode{ .textured = true });
+            return;
+        }
         if (rl.isKeyPressed(.b)) {
             self.render_mode.toggle(RenderMode{ .backface_culling = true });
             return;
@@ -121,6 +128,7 @@ pub const Renderer = struct {
         const rotation_matrix_z: Matrix = Matrix.rotateZ(self.mesh.rotation.z);
 
         for (self.mesh.faces.items) |face| {
+            // TODO: init face textures
             const first_face_vertex: usize = @intCast(face.a);
             const second_face_vertex: usize = @intCast(face.b);
             const third_face_vertex: usize = @intCast(face.c);
@@ -179,7 +187,7 @@ pub const Renderer = struct {
                 const triangle_color: Color = applyLightIntensity(Color.White, light_normal_dot);
 
                 const average_depth: f32 = (vertex_a.z + vertex_b.z + vertex_c.z) / 3.0;
-                var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .depth = average_depth, .color = triangle_color };
+                var projected_triangle = Triangle{ .v1 = undefined, .v2 = undefined, .v3 = undefined, .v1_uv = undefined, .v2_uv = undefined, .v3_uv = undefined, .depth = average_depth, .color = triangle_color };
 
                 var projected_points: [3]Vec4 = undefined;
                 for (0..3) |i| {
@@ -202,6 +210,10 @@ pub const Renderer = struct {
                 projected_triangle.v1 = Vec2{ .x = projected_points[0].x, .y = projected_points[0].y };
                 projected_triangle.v2 = Vec2{ .x = projected_points[1].x, .y = projected_points[1].y };
                 projected_triangle.v3 = Vec2{ .x = projected_points[2].x, .y = projected_points[2].y };
+
+                projected_triangle.v1_uv = face.a_uv;
+                projected_triangle.v2_uv = face.b_uv;
+                projected_triangle.v3_uv = face.c_uv;
 
                 self.triangles_to_render.append(self.allocator, projected_triangle) catch |err| {
                     log.err("[Renderer] Error when projecting triangle: {}", .{err});
@@ -226,8 +238,13 @@ pub const Renderer = struct {
 
         log.info("[Renderer] Loading OBJ file into mesh", .{});
 
-        self.mesh.loadOBJ(self.allocator, "resources/meshes/f22.obj") catch |err| {
-            log.err("[Renderer] Error while loading mesh from OBJ file: {}", .{err});
+        // self.mesh.loadOBJ(self.allocator, "resources/meshes/f22.obj") catch |err| {
+        //     log.err("[Renderer] Error while loading mesh from OBJ file: {}", .{err});
+        //     return Error.MeshLoadingFailed;
+        // };
+
+        self.mesh.loadDebugCubeMesh(self.allocator) catch |err| {
+            log.err("[Renderer] Error while loading debug mesh: {}", .{err});
             return Error.MeshLoadingFailed;
         };
 
@@ -308,6 +325,14 @@ pub const Renderer = struct {
                     return Error.ColorBufferMemoryLeaked;
                 };
             }
+
+            // if (self.render_mode.textured) {
+            //     // TODO: consider providing the whole triangle struct
+            //     self.color_buffer.drawTexturedTriangle(v1_x, v1_y, v2_x, v2_y, v3_x, v3_y, triangle.v1_tex, triangle.v2_tex, triangle.v2_tex, triangle.color) catch |err| {
+            //         log.err("[Renderer] Error rendering a rectangle: {}", .{err});
+            //         return Error.ColorBufferMemoryLeaked;
+            //     };
+            // }
         }
 
         self.triangles_to_render.clearRetainingCapacity();

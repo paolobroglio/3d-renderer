@@ -1,6 +1,8 @@
 const std = @import("std");
 const mem = std.mem;
 const Color = @import("Color.zig").Color;
+const texture = @import("texture.zig");
+const UVCoords = texture.UVCoords;
 
 const Error = error{ColorBufferOutOfBounds};
 
@@ -122,6 +124,10 @@ pub const ColorBuffer = struct {
             try self.fillFlatTopTriangle(mx1, my1, m_x, m_y, mx2, my2, color);
         }
     }
+
+    // pub fn drawTexturedTriangle(self: *ColorBuffer, x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, uv_0: UVCoords, uv_1: UVCoords, uv_2: UVCoords, color: Color) Error!void {
+    //
+    // }
 
     pub fn clear(self: *ColorBuffer, color: Color) Error!void {
         for (self.b.items, 0..) |_, i| {
